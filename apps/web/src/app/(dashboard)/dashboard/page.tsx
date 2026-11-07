@@ -187,7 +187,7 @@ export default function DashboardPage() {
               don&apos;t need ETH.
             </p>
             <Link href="/onramp" onClick={()=>setRechargeOpen(false)} className="block rounded-xl border border-primary p-3 text-center text-sm text-primary">
-              Buy USDC with Coinbase — Sandbox
+              Buy USDC with Coinbase
             </Link>
             <p className="text-xs text-muted-foreground">Review/test mode only. No real charge or wallet funding.</p>
             <button

@@ -304,7 +304,7 @@ function LoginContent() {
                 className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-40 text-white rounded-xl font-medium transition-colors"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                {redirectTo === '/onramp' ? 'Continue to Coinbase Sandbox' : 'Continue to Dashboard'}
+                {redirectTo === '/onramp' ? 'Continue to Coinbase checkout' : 'Continue to Dashboard'}
               </button>
 
               <a

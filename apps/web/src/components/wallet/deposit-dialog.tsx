@@ -7,6 +7,7 @@ import { Tabs } from '@base-ui/react/tabs'
 import { Popover } from '@base-ui/react/popover'
 import { Wallet, CircleHelp } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { CoinbaseCheckout } from '@/components/wallet/coinbase-checkout'
 
 function DepositHelp({ label, children }: { label: string; children: React.ReactNode }) {
   return <Popover.Root>
@@ -37,6 +38,7 @@ export function DepositDialog({ open, onOpenChange, address, insufficient = fals
   const [qr, setQr] = useState<{ address: string; url: string } | null>(null)
   const [copyMessage, setCopyMessage] = useState('')
   const [qrError, setQrError] = useState(false)
+  const [method,setMethod] = useState('wallet')
   const qc = useQueryClient()
   useEffect(() => {
     let active = true
@@ -68,7 +70,7 @@ export function DepositDialog({ open, onOpenChange, address, insufficient = fals
         <DialogTitle>Add USDC</DialogTitle>
         <DialogDescription>{insufficient ? 'Your USDC balance is too low for this message. Add funds, then retry.' : 'Fund your account wallet to pay for chats.'}</DialogDescription>
       </DialogHeader>
-      <Tabs.Root defaultValue="wallet">
+      <Tabs.Root value={method} onValueChange={value=>setMethod(String(value))}>
         <Tabs.List className="flex rounded-lg bg-secondary p-1" aria-label="Funding method">
           <div className="flex flex-1 items-center rounded-md has-[[data-active]]:bg-background">
             <Tabs.Tab value="wallet" className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm"><Wallet className="h-4 w-4" />Wallet</Tabs.Tab>
@@ -78,10 +80,13 @@ export function DepositDialog({ open, onOpenChange, address, insufficient = fals
             <Tabs.Tab value="binance" className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm"><BinanceIcon />Binance</Tabs.Tab>
             <DepositHelp label="Binance transfer help"><p>In Binance, select Withdraw / Send → USDC → On-chain → Base, then paste this address. Check Binance for current fees, minimums and network availability.</p><p>This is a wallet address QR code, not a Binance Pay code. Use the scanner in the on-chain withdrawal address field, or copy the address.</p><p>Binance Pay is not required. If Base withdrawals are unavailable, do not select another network.</p></DepositHelp>
           </div>
+          <Tabs.Tab value="coinbase" className="flex flex-1 items-center justify-center rounded-md px-2 py-2 text-sm data-[active]:bg-background">Buy USDC</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="wallet" />
         <Tabs.Panel value="binance" className="pt-2 text-xs text-muted-foreground">Copy the address for a Binance on-chain withdrawal. Do not use Binance Pay scanning.</Tabs.Panel>
+        <Tabs.Panel value="coinbase" className="pt-3">{validAddress?<CoinbaseCheckout/>:<p className="text-sm">Finish signing in to set up your wallet.</p>}</Tabs.Panel>
       </Tabs.Root>
+      {method!=='coinbase'&&<>
       <div className="rounded-lg bg-secondary p-3 text-sm">Network: <strong>Base mainnet</strong> · Asset: <strong>USDC</strong><p className="mt-1 text-xs text-muted-foreground">Select Base and native USDC on the sending platform, not another network or USDbC. We recommend receiving more than 1 USDC. {balance.data?.transfersEnabled === false ? 'Withdrawals in this app are currently unavailable.' : 'Withdrawals depend on availability, limits and cooldowns. The receiving wallet must support Base USDC.'}</p></div>
       {validAddress ? <>
         <div className="mx-auto flex h-44 w-44 max-w-full items-center justify-center rounded-xl bg-white">
@@ -95,6 +100,7 @@ export function DepositDialog({ open, onOpenChange, address, insufficient = fals
         {copyMessage && <p role="status" className="text-xs">{copyMessage}</p>}
         <div className="flex items-center justify-between gap-2 text-sm"><span>{balance.isError ? 'Balance unavailable. Try refreshing.' : balance.data ? `Balance: ${balance.data.usdc} USDC` : 'Loading balance…'}</span><button type="button" disabled={balance.isFetching} className="shrink-0 text-primary disabled:opacity-50" onClick={() => void qc.invalidateQueries({ queryKey: ['wallet-balance'] })}>{balance.isFetching ? 'Loading…' : 'Refresh balance'}</button></div>
       </> : <p role="status" className="text-sm">Your wallet is not ready. Finish signing in, then try again.</p>}
+      </>}
     </DialogContent>
   </Dialog>
 }
