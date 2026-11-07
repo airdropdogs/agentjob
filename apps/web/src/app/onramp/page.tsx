@@ -7,7 +7,6 @@ import { useQuery } from '@tanstack/react-query'
 type TestOrder = { paymentLink: string; receipt: string; orderId: string; wallet: string; paymentTotal?: string; purchaseAmount?: string }
 
 export default function OnrampReviewPage() {
-  const [accepted, setAccepted] = useState(false)
   const [busy, setBusy] = useState(false)
   const [order, setOrder] = useState<TestOrder | null>(null)
   const [status, setStatus] = useState('')
@@ -24,7 +23,7 @@ export default function OnrampReviewPage() {
     setBusy(true); setError('')
     try {
       const response = await fetch('/api/wallet/onramp/sandbox', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(action === 'create' ? { action, acceptSandbox: accepted } : { action, receipt: order?.receipt }), signal: AbortSignal.timeout(30_000) })
+        body: JSON.stringify(action === 'create' ? { action, acceptSandbox: true } : { action, receipt: order?.receipt }), signal: AbortSignal.timeout(30_000) })
       const body = await response.json()
       if (!response.ok) throw new Error(body.error || 'Sandbox unavailable')
       if (action === 'create') { setOrder(body); setStatus('Sandbox order created. Loading Coinbase checkout below…') }
@@ -53,25 +52,22 @@ export default function OnrampReviewPage() {
 
   return <main className="mx-auto max-w-xl space-y-5 px-5 py-12">
     <Link href="/" className="text-sm text-primary">← AgentJob</Link>
-    <h1 className="text-2xl font-semibold">Coinbase Onramp · Sandbox</h1>
-    <p className="text-sm text-muted-foreground">Coinbase Onramp review environment. Sign in with your own email, then test a simulated USD 5 purchase of USDC on Base into your AgentJob wallet.</p>
-    <div className="rounded-xl border border-border bg-secondary p-4 text-sm">Test only: no real card charge, USDC transfer or chat payment. Do not enter real card details. Production access is not enabled. Live Headless Onramp is limited to eligible US users.</div>
-    <ol className="list-inside list-decimal space-y-2 rounded-xl border p-4 text-sm"><li>Sign in to AgentJob using your own email.</li><li>Confirm sandbox mode and click Buy USDC — Sandbox.</li><li>Complete the simulated Coinbase payment below, then click Check order status.</li></ol>
-    {sessionLoading?<p role="status" className="text-sm">Checking sign-in status…</p>:session?.userId?<p className="break-all rounded-xl border p-3 text-sm">Signed in as {session.email}<br/>Destination wallet: {session.wallet || 'Wallet setup incomplete'}</p>:<Link href="/login?from=%2Fonramp" className="inline-block rounded-xl border px-4 py-3 text-primary">Sign in / create a test account</Link>}
+    <h1 className="text-2xl font-semibold">Try Coinbase checkout</h1>
+    <p className="text-sm text-muted-foreground">Sign in, then open checkout below. No wallet funding is needed.</p>
+    <div className="rounded-xl border border-border bg-secondary p-4 text-sm"><strong>Sandbox · USD 5 → USDC on Base</strong><p className="mt-1">No real charge or USDC deposit. Do not enter real card details.</p></div>
+    {sessionLoading?<p role="status" className="text-sm">Checking sign-in status…</p>:!session?.userId?<Link href="/login?from=%2Fonramp" className="block rounded-xl bg-primary p-3 text-center text-primary-foreground">Sign in to try checkout</Link>:!session.wallet?<p role="alert" className="text-sm text-destructive">Wallet setup is incomplete. Finish setting up your account before opening checkout.</p>:null}
     {sessionError&&<p role="alert" className="text-sm text-destructive">Unable to check your session. Refresh this page and try again.</p>}
-    <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} className="mt-1" />I understand this uses Coinbase sandbox orders with synthetic test contact information and does not fund my wallet.</label>
-    <p className="text-xs text-muted-foreground">Review Coinbase’s <a className="underline" href="https://www.coinbase.com/legal/guest-checkout/us" target="_blank" rel="noreferrer">Guest Checkout Terms</a>, <a className="underline" href="https://www.coinbase.com/legal/user_agreement/united_states" target="_blank" rel="noreferrer">User Agreement</a> and <a className="underline" href="https://www.coinbase.com/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>. Real purchases require a separate production implementation and user verification.</p>
-    <button disabled={!session?.wallet || !accepted || busy || !!order} onClick={() => void request('create')} className="w-full rounded-xl bg-primary p-3 text-primary-foreground disabled:opacity-50">{busy ? 'Please wait…' : 'Buy USDC — Sandbox'}</button>
-    <p className="text-xs text-muted-foreground">This button creates a sandbox order on our server and loads the Coinbase-hosted checkout from pay.coinbase.com below. It does not open wallet-transfer instructions.</p>
+    {session?.userId&&!order&&<><p className="text-xs text-muted-foreground">By opening checkout, you acknowledge this is a simulation using synthetic test contact details and agree to Coinbase’s <a className="underline" href="https://www.coinbase.com/legal/guest-checkout/us" target="_blank" rel="noreferrer">Guest Checkout Terms</a>, <a className="underline" href="https://www.coinbase.com/legal/user_agreement/united_states" target="_blank" rel="noreferrer">User Agreement</a> and <a className="underline" href="https://www.coinbase.com/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</p>
+    <button disabled={!session.wallet || busy} onClick={() => void request('create')} className="w-full rounded-xl bg-primary p-3 text-primary-foreground disabled:opacity-50">{busy ? 'Opening Coinbase checkout…' : 'Open Coinbase checkout — Sandbox'}</button></>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {status && <p role="status" className="text-sm">{status}</p>}
     {order && <section className="space-y-3">
-      <p className="break-all text-xs text-muted-foreground">Destination: {order.wallet}<br />Test order: {order.orderId}<br />Quoted total: {order.paymentTotal ?? 'See Coinbase'} USD · Receive: {order.purchaseAmount ?? 'See Coinbase'} USDC (simulated)</p>
+      <h2 className="font-semibold">Coinbase checkout · Sandbox</h2>
       <iframe ref={frame} src={order.paymentLink} title="Coinbase sandbox payment" allow="payment" sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer" className="h-96 w-full rounded-xl border border-border" />
       <p className="text-xs text-muted-foreground">If checkout does not appear, check your browser’s privacy or content-blocking settings. Do not enter real card details. An expired checkout requires a new sandbox session.</p>
       <button disabled={busy} onClick={() => void request('status')} className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50">Check order status</button>
       <button disabled={busy} onClick={()=>{setOrder(null);setStatus('');setError('')}} className="ml-3 text-sm underline">Start a new sandbox session</button>
+      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Review details</summary><p className="mt-2 break-all">Headless Onramp · Server-generated payment link<br/>Destination: {order.wallet}<br/>Test order: {order.orderId}<br/>Quoted total: {order.paymentTotal ?? 'See Coinbase'} USD · Receive: {order.purchaseAmount ?? 'See Coinbase'} USDC (simulated)</p></details>
     </section>}
-    <p className="text-xs text-muted-foreground">This isolated review page does not change the existing wallet-transfer funding flow, free messages, payment limits or withdrawals.</p>
   </main>
 }
