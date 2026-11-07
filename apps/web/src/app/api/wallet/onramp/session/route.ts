@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { createLimiter, getRedisOptional } from '@/lib/redis-limiters'
 import { onrampOrigin } from '@/lib/onramp-sandbox'
 import { createHostedSession, hostedSession } from '@/lib/onramp-hosted'
+import { onrampClientIp } from '@/lib/onramp-client-ip'
 
 function reply(body: unknown, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store', Vary: 'Origin' } })
@@ -22,8 +23,7 @@ export async function POST(request: Request) {
     if (Number(request.headers.get('content-length') || 0) > 1024) return reply({ error: 'Request too large.' }, 413)
     const body = await request.json().catch(() => null)
     if (body?.acceptLive !== true) return reply({ error: 'Please acknowledge that this is a real purchase.' }, 400)
-    // Use the last address appended by the deployment proxy, not a client-supplied first entry.
-    const clientIp = request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim() || ''
+    const clientIp = onrampClientIp(request.headers)
     const params = hostedSession(session.userId, user.wallet, origin, clientIp)
     const redis = getRedisOptional()
     if (!redis) return reply({ error: 'Checkout is temporarily unavailable.' }, 503)
