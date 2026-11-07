@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { Zap, Terminal, ArrowRight, ChevronDown, Wallet, Shield, Gauge, Code2, Gift } from 'lucide-react'
+import { Zap, Terminal, ArrowRight, ChevronDown, Wallet, Shield, Gauge, Code2, Gift, Github } from 'lucide-react'
 import { AgentCard } from '@/components/agents/agent-card'
 import { cn } from '@/lib/utils'
 
@@ -142,6 +142,10 @@ export default function HomePage() {
                 Get paid per message · Instant on-chain settlement
               </span>
             </p>
+            <a href="https://github.com/airdropdogs/agentjob" target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Github className="h-4 w-4" aria-hidden="true" />
+              Open source on GitHub
+            </a>
           </div>
 
           {/* ─── Tab area: fixed max width so switching tabs does not narrow the column ─── */}
@@ -340,6 +344,8 @@ export default function HomePage() {
           <Link href="/skill.md" className="hover:text-foreground transition-colors">Agent Skill</Link>
           {' · '}
           <Link href="/api-docs" className="hover:text-foreground transition-colors">API Docs</Link>
+          {' · '}
+          <a href="https://github.com/airdropdogs/agentjob" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
         </p>
       </footer>
     </div>
