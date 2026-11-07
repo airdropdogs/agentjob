@@ -7,6 +7,7 @@ export function VerificationPanel() {
   const cache = useQueryClient()
   const [agentIds,setAgents] = useState<string[]>([]), [capabilities,setCapabilities] = useState<Capability[]>(Object.keys(CAPABILITIES) as Capability[])
   const [search,setSearch] = useState(''), [multiple,setMultiple] = useState(false)
+  const [onlineOnly,setOnlineOnly] = useState(true)
   const [error,setError] = useState(''), [busy,setBusy] = useState(false)
   const [settingsNotice,setSettingsNotice] = useState('')
   const [requestKey,setRequestKey] = useState<string | null>(null)
@@ -25,7 +26,15 @@ export function VerificationPanel() {
   if(!data?.enabled)return <p className="text-sm text-muted-foreground">Capability testing is disabled. Enable AGENT_VERIFICATION_ENABLED after applying the verification migrations.</p>
   const selected=data.agents.filter((a:any)=>agentIds.includes(a.id))
   const online=(a:any)=>a.last_heartbeat_at && Date.now()-new Date(a.last_heartbeat_at).getTime()<120000
-  const matching=data.agents.filter((a:any)=>[a.name,a.wallet,a.id].some(v=>String(v??'').toLowerCase().includes(search.trim().toLowerCase())))
+  const matching=data.agents.filter((a:any)=>(!onlineOnly||online(a))&&[a.name,a.wallet,a.id].some(v=>String(v??'').toLowerCase().includes(search.trim().toLowerCase())))
+  const groups = [
+    {id:'pending',label:'Needs review',color:'text-amber-700 dark:text-amber-400'},
+    {id:'active',label:'In progress',color:'text-blue-700 dark:text-blue-400'},
+    {id:'reviewed',label:'Reviewed results',color:'text-emerald-700 dark:text-emerald-400'},
+    {id:'other',label:'Runtime inquiries and other results',color:'text-muted-foreground'},
+  ]
+  const groupFor=(r:any)=>['queued','running','evaluating'].includes(r.status)?'active':r.capability==='runtime_info'?'other':['review_required','error'].includes(r.status)?'pending':['passed','failed','revoked'].includes(r.status)?'reviewed':'other'
+  const statusColor=(status:string)=>status==='passed'?'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400':['failed','error','revoked'].includes(status)?'bg-red-500/10 text-red-700 dark:text-red-400':status==='review_required'?'bg-amber-500/10 text-amber-700 dark:text-amber-400':'bg-secondary text-muted-foreground'
   const total=selected.length*capabilities.length
   const overLimit=capabilities.length>data.settings.agentDailyLimit || selected.some((a:any)=>(a.daily_used??0)+capabilities.length>data.settings.agentDailyLimit) || (data.dailyUsed??0)+total>data.settings.dailyLimit
   return <section className="space-y-5">
@@ -35,6 +44,7 @@ export function VerificationPanel() {
     <fieldset className="space-y-3 rounded-xl border p-3"><legend className="px-1 text-sm font-medium">Agents</legend>
       <input aria-label="Search Agents" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name, wallet or Agent ID" className="w-full rounded-lg border bg-background p-2 text-sm"/>
       <div className="flex flex-wrap gap-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={multiple} disabled={busy} onChange={e=>{setMultiple(e.target.checked);if(!e.target.checked)setAgents(ids=>ids.slice(0,1));setRequestKey(null)}}/>Select multiple Agents</label>
+        <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={onlineOnly} disabled={busy} onChange={e=>{setOnlineOnly(e.target.checked);if(e.target.checked)setAgents(ids=>ids.filter(id=>data.agents.some((a:any)=>a.id===id&&online(a))));setRequestKey(null)}}/>Online only</label>
         {multiple&&<button disabled={busy} className="underline" onClick={()=>{setAgents(matching.filter(online).slice(0,20).map((a:any)=>a.id));setRequestKey(null)}}>Select matching online (up to 20)</button>}
         {!!agentIds.length&&<button disabled={busy} className="underline" onClick={()=>{setAgents([]);setRequestKey(null)}}>Clear selection ({agentIds.length})</button>}
       </div>
@@ -55,8 +65,8 @@ export function VerificationPanel() {
       {Object.entries({dailyLimit:'Platform tests/day',agentDailyLimit:'Agent tests/day',maxConcurrent:'Concurrent tests',timeoutMinutes:'Timeout minutes',validDays:'Valid days',evidenceRetentionDays:'Source retention days'}).map(([key,label])=><label key={key} className="text-xs">{label}<input className="block w-24 rounded border bg-background p-2" name={key} type="number" min={key==='timeoutMinutes'?2:1} max={({dailyLimit:10000,agentDailyLimit:1000,maxConcurrent:10,timeoutMinutes:30,validDays:90,evidenceRetentionDays:30} as Record<string,number>)[key]} required defaultValue={data.settings[key]}/></label>)}
       <button disabled={busy} className="rounded border px-3">Save limits</button></form>{settingsNotice&&<p role="status" className="mt-2 text-sm">{settingsNotice}</p>}</details>
     <section className="space-y-3"><h3 className="font-medium">Runtime information</h3><p className="text-xs text-muted-foreground">Use Ask Agent to collect a declaration through chat (one test slot). New replies automatically fill the form for your review. Connector reports or existing details provide fallback values. Unknown is allowed. Saving publishes the declaration, not a verified model identity.</p>{data.agents.filter((a:any)=>agentIds.length?agentIds.includes(a.id):data.runs.some((r:any)=>r.agent_id===a.id)).map((a:any)=><RuntimeInfoForm key={a.id+JSON.stringify(a.runtime)} agent={a} busy={busy} save={action}/>)}</section>
-    <div className="space-y-3">{data.runs.length===0?<p className="text-muted-foreground">No tests yet.</p>:data.runs.map((r:any)=><article key={r.id} className="rounded-xl border p-4 text-sm">
-      <div className="flex flex-wrap justify-between gap-2"><strong>{r.name} · {r.capability==='runtime_info'?'Runtime inquiry':CAPABILITIES[r.capability as Capability]}</strong><span>{r.status.replaceAll('_',' ')}</span></div>
+    <div className="space-y-5"><div><h3 className="font-medium">Test results</h3><p className="text-xs text-muted-foreground">Latest 100 tests across all Agents, including offline Agents. Passed and failed results may be assessed automatically or by an administrator.</p></div>{data.runs.length===0?<p className="text-muted-foreground">No tests yet.</p>:groups.map(group=>{const runs=data.runs.filter((r:any)=>groupFor(r)===group.id);return <section key={group.id} className="space-y-3" aria-label={group.label}><h4 className={`font-medium ${group.color}`}>{group.label} ({runs.length})</h4>{!runs.length?<p className="text-sm text-muted-foreground">No results in this group.</p>:runs.map((r:any)=><article key={r.id} className="rounded-xl border p-4 text-sm">
+      <div className="flex flex-wrap justify-between gap-2"><strong>{r.name} · {r.capability==='runtime_info'?'Runtime inquiry':CAPABILITIES[r.capability as Capability]}</strong><span className={`rounded-full px-2 py-1 text-xs font-medium ${statusColor(r.status)}`}>{r.status.replaceAll('_',' ')}</span></div>
       <p className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()} · Suite {r.suite_version}</p>
       {r.result?.reason&&<p className="mt-2">{r.result.reason}</p>}
       <details className="mt-2"><summary>Test evidence and review</summary><pre className="overflow-auto whitespace-pre-wrap py-2 text-xs">{JSON.stringify({challenge:r.challenge,result:r.result,evaluator:r.evaluator_model},null,2)}</pre>
@@ -64,7 +74,7 @@ export function VerificationPanel() {
       </details>
         {r.capability!=='runtime_info'&&['review_required','passed','failed','error'].includes(r.status)&&<form className="mt-3 flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void action({action:'review',id:r.id,verdict:f.get('verdict'),reason:f.get('reason')})}}><input name="reason" aria-label="Review reason" defaultValue="Manual review of the test reply and available file evidence." required minLength={10} maxLength={1000} placeholder="Review evidence and explain decision" className="min-w-60 rounded border bg-background p-2"/><select name="verdict" aria-label="Review decision" defaultValue={r.status==='review_required'||r.status==='passed'?'passed':'failed'} className="rounded border bg-background p-2"><option value="revoked">Revoke</option><option value="failed">Fail</option><option value="passed">Pass after manual review</option></select><button disabled={busy} className="rounded border px-3">Save review</button></form>}
       {['queued','running','evaluating'].includes(r.status)&&<button disabled={busy} onClick={()=>void action({action:'cancel',id:r.id})} className="mt-2 underline">Cancel test</button>}
-    </article>)}</div>
+    </article>)}</section>})}</div>
   </section>
 }
 
