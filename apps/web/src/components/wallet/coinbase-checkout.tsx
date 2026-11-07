@@ -1,11 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Loader2, ShieldCheck } from 'lucide-react'
 
 export function CoinbaseCheckout() {
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
   const [url,setUrl] = useState('')
+  useEffect(() => {
+    function restore(event: PageTransitionEvent) {
+      if (event.persisted) { setBusy(false); setUrl('') }
+    }
+    window.addEventListener('pageshow', restore)
+    return () => window.removeEventListener('pageshow', restore)
+  }, [])
   async function openCheckout() {
     setBusy(true);setError('');setUrl('')
     try {
@@ -16,13 +24,14 @@ export function CoinbaseCheckout() {
       if (checkout.origin !== 'https://pay.coinbase.com' || !checkout.searchParams.get('sessionToken')) throw new Error('Invalid checkout link.')
       setUrl(checkout.toString())
       window.location.assign(checkout.toString())
-    } catch(e) {setError(e instanceof Error ? e.message : 'Checkout unavailable.')} finally {setBusy(false)}
+    } catch(e) {setError(e instanceof Error ? e.message : 'Checkout unavailable.');setBusy(false)}
   }
   return <section className="space-y-3 text-sm">
     <div className="rounded-lg bg-secondary p-3"><strong>Pay with Coinbase · USDC on Base</strong><p className="mt-1 text-xs text-muted-foreground">Requested amount: USD 0.0001. Coinbase may reject this amount due to minimums or currency precision. We do not automatically increase it. Eligibility, fees and the final amount are confirmed by Coinbase. This is a real purchase.</p></div>
     <p className="text-xs text-muted-foreground">Limited access: Coinbase has advised up to 25 transactions per project, at most USD 5 each. Remaining allowance is not shown here. Do not confirm a total above USD 5; if the minimum is higher, stop and contact support.</p>
     <p className="text-xs text-muted-foreground">By continuing, you agree to Coinbase’s <a href="https://www.coinbase.com/legal/user_agreement" target="_blank" rel="noreferrer" className="underline">User Agreement</a> and <a href="https://www.coinbase.com/legal/privacy" target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>. You review and confirm payment on Coinbase. Opening checkout does not charge you.</p>
-    <button type="button" disabled={busy} onClick={()=>void openCheckout()} className="w-full rounded-xl bg-primary p-3 text-primary-foreground disabled:opacity-50">{busy?'Opening Coinbase…':'Continue to Coinbase · USD 0.0001'}</button>
+    <button type="button" disabled={busy} aria-busy={busy} onClick={()=>void openCheckout()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary p-3 text-primary-foreground disabled:cursor-wait disabled:opacity-80">{busy&&<Loader2 aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none"/>}{busy?(url?'Redirecting to Coinbase…':'Preparing secure checkout…'):'Continue to Coinbase · USD 0.0001'}</button>
+    {busy&&<div role="status" aria-live="polite" className="flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3"><ShieldCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-primary"/><div><p className="font-medium">{url?'Opening Coinbase checkout':'Connecting securely to Coinbase'}</p><p className="mt-1 text-xs text-muted-foreground">{url?'You are being redirected to pay.coinbase.com. Please keep this window open.':'Please wait while we prepare your checkout. No payment has been made.'}</p></div></div>}
     {url&&<a href={url} rel="noreferrer" className="block text-center underline">Continue to the checkout just created</a>}
     {error&&<p role="alert" className="text-destructive">{error}</p>}
     <p className="text-xs text-muted-foreground">After purchasing, return to your wallet and refresh the USDC balance. Returning from Coinbase does not by itself confirm a deposit.</p>
