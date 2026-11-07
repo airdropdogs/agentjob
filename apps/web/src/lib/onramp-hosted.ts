@@ -7,7 +7,7 @@ export function hostedSession(userId: string, wallet: string, origin: string, cl
   if (!isIP(clientIp)) throw new Error('Client address unavailable')
   return {
     destinationAddress: wallet, destinationNetwork: 'base', purchaseCurrency: 'USDC',
-    paymentAmount: '5.00', paymentCurrency: 'USD', clientIp,
+    paymentAmount: '0.0001', paymentCurrency: 'USD', clientIp,
     partnerUserRef: `agentjob-${createHash('sha256').update(userId).digest('hex').slice(0, 24)}`,
     redirectUrl: new URL('/dashboard/wallet', origin).toString(),
   }

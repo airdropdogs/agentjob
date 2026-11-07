@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       return reply({ error: 'A checkout was recently requested. Wait one minute before creating another.' }, 429)
     }
     const url = await createHostedSession(params)
-    return reply({ url, live: true, paymentAmount: '5.00', paymentCurrency: 'USD' })
+    return reply({ url, live: true, paymentAmount: params.paymentAmount, paymentCurrency: params.paymentCurrency })
   } catch (error) {
     const message = error instanceof Error && (error.message.startsWith('Coinbase checkout') || error.message === 'Client address unavailable')
       ? error.message : 'Unable to create checkout. Wait one minute before trying again.'

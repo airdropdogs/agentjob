@@ -31,14 +31,15 @@ function BinanceIcon() {
   </svg>
 }
 
-export function DepositDialog({ open, onOpenChange, address, insufficient = false }: {
-  open: boolean; onOpenChange: (open: boolean) => void; address?: string | null; insufficient?: boolean
+export function DepositDialog({ open, onOpenChange, address, insufficient = false, defaultMethod = 'wallet' }: {
+  open: boolean; onOpenChange: (open: boolean) => void; address?: string | null; insufficient?: boolean; defaultMethod?: 'wallet' | 'coinbase'
 }) {
   const validAddress = /^0x[0-9a-f]{40}$/i.test(address ?? '') && !/^0x0{40}$/i.test(address ?? '')
   const [qr, setQr] = useState<{ address: string; url: string } | null>(null)
   const [copyMessage, setCopyMessage] = useState('')
   const [qrError, setQrError] = useState(false)
-  const [method,setMethod] = useState('wallet')
+  const [method,setMethod] = useState<string>(defaultMethod)
+  useEffect(() => { if (open) setMethod(defaultMethod) }, [open, defaultMethod])
   const qc = useQueryClient()
   useEffect(() => {
     let active = true
@@ -80,7 +81,7 @@ export function DepositDialog({ open, onOpenChange, address, insufficient = fals
             <Tabs.Tab value="binance" className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm"><BinanceIcon />Binance</Tabs.Tab>
             <DepositHelp label="Binance transfer help"><p>In Binance, select Withdraw / Send → USDC → On-chain → Base, then paste this address. Check Binance for current fees, minimums and network availability.</p><p>This is a wallet address QR code, not a Binance Pay code. Use the scanner in the on-chain withdrawal address field, or copy the address.</p><p>Binance Pay is not required. If Base withdrawals are unavailable, do not select another network.</p></DepositHelp>
           </div>
-          <Tabs.Tab value="coinbase" className="flex flex-1 items-center justify-center rounded-md px-2 py-2 text-sm data-[active]:bg-background">Buy USDC</Tabs.Tab>
+          <Tabs.Tab value="coinbase" className="flex flex-1 items-center justify-center rounded-md px-2 py-2 text-sm data-[active]:bg-background">Pay</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="wallet" />
         <Tabs.Panel value="binance" className="pt-2 text-xs text-muted-foreground">Copy the address for a Binance on-chain withdrawal. Do not use Binance Pay scanning.</Tabs.Panel>

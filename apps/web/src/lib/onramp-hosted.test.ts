@@ -2,13 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { hostedSession, hostedCheckoutUrl } from './onramp-hosted'
 
-test('live Hosted session binds Base USDC to the account wallet and requests five USD without synthetic identity', () => {
+test('live Hosted session preserves the requested fractional USD amount without rounding or synthetic identity', () => {
   const wallet='0x1111111111111111111111111111111111111111'
   const body=hostedSession('private-user-id',wallet,'https://agent-job.ai','203.0.113.1')
   assert.equal(body.destinationAddress,wallet)
   assert.equal(body.destinationNetwork,'base')
   assert.equal(body.purchaseCurrency,'USDC')
-  assert.equal(body.paymentAmount,'5.00')
+  assert.equal(body.paymentAmount,'0.0001')
   assert.equal(body.redirectUrl,'https://agent-job.ai/dashboard/wallet')
   assert.equal(body.partnerUserRef.includes('private-user-id'),false)
   assert.equal(JSON.stringify(body).includes('sandbox'),false)

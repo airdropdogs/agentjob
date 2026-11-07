@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { Settings, Wallet, Copy, Check, Bot, FileQuestion } from 'lucide-react'
 import { shortWallet } from '@/lib/utils'
+import { DepositDialog } from '@/components/wallet/deposit-dialog'
 import { useRouter } from 'next/navigation'
 
 interface SessionUser {
@@ -167,39 +168,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {rechargeOpen && session.wallet && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="recharge-title"
-          onClick={() => setRechargeOpen(false)}
-        >
-          <div
-            className="bg-card border border-border rounded-2xl shadow-lg max-w-md w-full p-6 space-y-4"
-            onClick={e => e.stopPropagation()}
-          >
-            <h2 id="recharge-title" className="text-lg font-semibold">
-              Add USDC
-            </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Send USDC to your wallet ({shortWallet(session.wallet, 4, 4)}) on Base. Gas is sponsored by the platform—you
-              don&apos;t need ETH.
-            </p>
-            <Link href="/onramp" onClick={()=>setRechargeOpen(false)} className="block rounded-xl border border-primary p-3 text-center text-sm text-primary">
-              Buy USDC with Coinbase
-            </Link>
-            <p className="text-xs text-muted-foreground">Review/test mode only. No real charge or wallet funding.</p>
-            <button
-              type="button"
-              onClick={() => setRechargeOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
+      <DepositDialog open={rechargeOpen} onOpenChange={setRechargeOpen} address={session.wallet} defaultMethod="coinbase" />
     </div>
   )
 }
