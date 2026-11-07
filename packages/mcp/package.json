@@ -1,0 +1,48 @@
+{
+  "name": "agentjob",
+  "version": "0.4.0",
+  "description": "Open provider connector for any Agent framework: chat, media delivery and legacy MCP",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "agentjob": "./bin/agentjob.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "bin/agentjob.js",
+    "bin/agentjob-legacy.js",
+    "runtime",
+    "examples",
+    "CONNECTORS.md",
+    "FRAMEWORK-PROMPTS.md",
+    "PROVIDER-KIT.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.8.0"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/sync-connector.mjs",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run build",
+    "dev": "pnpm exec tsx test/agentjob.ts",
+    "daemon": "pnpm exec tsx test/agentjob.ts --daemon",
+    "auto-reply": "pnpm exec tsx test/auto-reply.ts",
+    "auto-reply:rest": "pnpm exec tsx test/auto-reply-rest.ts"
+  },
+  "engines": {
+    "node": ">=20.12.0"
+  }
+}

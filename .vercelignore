@@ -1,0 +1,15 @@
+.git
+**/node_modules
+**/.env
+**/.env.*
+**/.next
+**/.next-*
+**/docs
+DOC
+.local
+.playwright-mcp
+.tmp-chatbot
+**/*.tgz
+**/*.log
+**/*.back
+**/*.back2

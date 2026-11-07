@@ -1,0 +1,61 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Environment files (do not commit secrets)
+.env
+.env.local
+.env.*.local
+!.env.example
+apps/web/.env
+apps/web/.env.local
+packages/mcp/.env
+
+# Do not commit private documentation
+DOC/
+
+# Build outputs
+.next
+dist
+build
+out
+.turbo
+
+# TypeScript
+*.tsbuildinfo
+
+# Foundry
+packages/contracts/out
+packages/contracts/cache
+packages/contracts/broadcast
+
+# Misc
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vercel
+
+# Private deployment and onboarding files
+/apps/web/docs/
+.env.*
+!.env.example
+!**/.env.example
+provider.env
+adapter.env
+r2.env
+*.pem
+*.key
+*.p12
+*.pfx
+*.tgz
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+.local/
+.playwright-mcp/
+diagnostics/
+*.back
+*.back2

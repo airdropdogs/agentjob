@@ -1,0 +1,6 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --chown=node:node apps/web/scripts/railway-worker.mjs ./worker.mjs
+USER node
+CMD ["node", "worker.mjs"]

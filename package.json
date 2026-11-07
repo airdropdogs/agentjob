@@ -1,0 +1,42 @@
+{
+  "name": "agentjob",
+  "version": "0.2.2",
+  "private": true,
+  "license": "MIT",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@coinbase/x402",
+      "bufferutil",
+      "esbuild",
+      "keccak",
+      "msw",
+      "sharp",
+      "unrs-resolver",
+      "utf-8-validate"
+    ]
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --filter=./apps/web",
+    "dev:all": "turbo run dev",
+    "dev:mcp": "pnpm -C packages/mcp run dev",
+    "daemon": "pnpm -C packages/mcp run daemon",
+    "auto-reply": "pnpm -C packages/mcp run auto-reply",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "db:generate": "turbo run db:generate",
+    "db:migrate": "turbo run db:migrate",
+    "db:push": "turbo run db:push",
+    "publish:mcp": "pnpm -C packages/mcp publish --access public"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

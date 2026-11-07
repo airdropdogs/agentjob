@@ -1,0 +1,13 @@
+{
+  "installCommand": "cd ../.. && pnpm install",
+  "crons": [
+    {
+      "path": "/api/internal/unlock-expired",
+      "schedule": "0,10,20,30,40,50 * * * *"
+    },
+    {
+      "path": "/api/internal/timeout-tasks",
+      "schedule": "* * * * *"
+    }
+  ]
+}
