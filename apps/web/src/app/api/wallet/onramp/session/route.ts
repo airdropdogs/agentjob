@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm'
 import { createLimiter, getRedisOptional } from '@/lib/redis-limiters'
 import { onrampOrigin } from '@/lib/onramp-sandbox'
 import { createHostedSession, hostedSession } from '@/lib/onramp-hosted'
-import { onrampClientIp, onrampNetworkReport } from '@/lib/onramp-client-ip'
+import { onrampClientIp } from '@/lib/onramp-client-ip'
 
 function reply(body: unknown, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store', Vary: 'Origin' } })
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       return reply({ error: 'A checkout was recently requested. Wait one minute before creating another.' }, 429)
     }
     const url = await createHostedSession(params)
-    return reply({ url, live: true, paymentAmount: params.paymentAmount, paymentCurrency: params.paymentCurrency, network:onrampNetworkReport(request.headers) })
+    return reply({ url, live: true, paymentAmount: params.paymentAmount, paymentCurrency: params.paymentCurrency })
   } catch (error) {
     const message = error instanceof Error && (error.message.startsWith('Coinbase checkout') || error.message === 'Client address unavailable')
       ? error.message : 'Unable to create checkout. Wait one minute before trying again.'

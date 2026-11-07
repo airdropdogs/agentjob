@@ -8,39 +8,16 @@ for (const range of ['173.245.48.0/20','103.21.244.0/22','103.22.200.0/22','103.
 }
 
 export function onrampClientIp(headers: Headers) {
-  return resolveClientIp(headers).ip
-}
-
-function resolveClientIp(headers: Headers) {
   // Railway's edge supplies X-Real-IP for the immediate client. Never trust
   // arbitrary CF headers on requests sent straight to the Railway origin.
   const peer = headers.get('x-real-ip')?.trim() ?? ''
   const family = isIP(peer)
   if (!family) throw new Error('Client address unavailable')
-  if (!cloudflare.check(peer,family===6?'ipv6':'ipv4')) return {ip:peer,source:'x-real-ip',cloudflare:false}
+  if (!cloudflare.check(peer,family===6?'ipv6':'ipv4')) return peer
   // Preserve the real IPv6 address if Cloudflare Pseudo IPv4 is enabled.
   const ipv6 = headers.get('cf-connecting-ipv6')?.trim()
-  if (ipv6 && isIP(ipv6)===6) return {ip:ipv6,source:'cf-connecting-ipv6',cloudflare:true}
+  if (ipv6 && isIP(ipv6)===6) return ipv6
   const visitor = headers.get('cf-connecting-ip')?.trim() ?? ''
   if (!isIP(visitor)) throw new Error('Client address unavailable')
-  return {ip:visitor,source:'cf-connecting-ip',cloudflare:true}
-}
-
-export function onrampNetworkReport(headers: Headers) {
-  const forwarded = (headers.get('x-forwarded-for')??'').split(',').map(v=>v.trim()).filter(Boolean)
-  const country = headers.get('cf-ipcountry')??''
-  try {
-    const result=resolveClientIp(headers)
-    return {
-      version:1,checkedAt:new Date().toISOString(),code:'CLIENT_IP_RESOLVED',
-      source:result.source,ipVersion:isIP(result.ip),trustedCloudflare:result.cloudflare,
-      cloudflareCountry:result.cloudflare&&/^[A-Z]{2}$/.test(country)?country:null,
-      forwardedHopCount:forwarded.length,
-      selectedMatchesCloudflareVisitor:result.ip===headers.get('cf-connecting-ip')?.trim()||result.ip===headers.get('cf-connecting-ipv6')?.trim(),
-      selectedMatchesLastForwardedHop:result.ip===forwarded.at(-1),
-      countrySentToCoinbase:false,
-    }
-  } catch {
-    return {version:1,checkedAt:new Date().toISOString(),code:'CLIENT_IP_UNAVAILABLE',forwardedHopCount:forwarded.length,countrySentToCoinbase:false}
-  }
+  return visitor
 }
