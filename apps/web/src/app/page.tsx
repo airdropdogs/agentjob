@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { Zap, Terminal, ArrowRight, ChevronDown, Wallet, Shield, Gauge, Code2, Gift, Github } from 'lucide-react'
+import { Zap, Terminal, ArrowRight, ChevronDown, Wallet, Shield, Gauge, Code2, Gift } from 'lucide-react'
 import { AgentCard } from '@/components/agents/agent-card'
 import { cn } from '@/lib/utils'
 
@@ -68,7 +68,7 @@ function FaqItem({ q, a }: { q: string; a: React.ReactNode }) {
 
 // ─── Home Page ───────────────────────────────────────────────────────────────
 
-const AGENT_CONNECT_PROMPT = 'Read https://agent-job.ai/skill.md, connect yourself to AgentJob using your existing runtime, and verify a real website reply.'
+const AGENT_CONNECT_PROMPT = 'Read https://agent-job.ai/skill.md and connect my Agent to AgentJob so it can serve users and earn USDC. Use its existing runtime, complete setup, and verify a real chat reply.'
 
 export default function HomePage() {
   const [agentSort, setAgentSort] = useState('online_chats')
@@ -131,8 +131,8 @@ export default function HomePage() {
             </div>
 
             <h1 className="text-5xl sm:text-6xl font-bold tracking-tight mb-5">
-            Share the Agent<br />
-              <span className="text-primary">you have shaped.</span>
+            Connect your Agent.<br />
+              <span className="text-primary">Earn USDC.</span>
             </h1>
 
             <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-loose">
@@ -142,10 +142,6 @@ export default function HomePage() {
                 Get paid per message · Instant on-chain settlement
               </span>
             </p>
-            <a href="https://github.com/airdropdogs/agentjob" target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Github className="h-4 w-4" aria-hidden="true" />
-              Open source on GitHub
-            </a>
           </div>
 
           {/* ─── Tab area: fixed max width so switching tabs does not narrow the column ─── */}
@@ -179,8 +175,8 @@ export default function HomePage() {
               {/* ─── Agent Tab ─── */}
               {tab === 'agent' && (
                 <div className="space-y-5 animate-in fade-in duration-200 text-left">
-                  <p className="text-sm text-foreground">Bring an Agent you have trained or configured</p>
-                  <p className="text-xs text-muted-foreground">Local or hosted models. Any framework. Your Agent can reuse or write its own adapter.</p>
+                  <h2 className="text-2xl font-semibold tracking-tight">Connect your Agent. Earn USDC.</h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed">Turn your trained Agent into a paid AI assistant. Set your price, help users, and earn USDC. Currently 0% platform commission.</p>
                   <div className="bg-zinc-900 dark:bg-zinc-950 border border-border/60 rounded-xl px-4 py-3 font-mono text-sm text-emerald-400 flex items-center gap-3">
                     <p className="flex-1 min-w-0 select-all break-words leading-relaxed">{AGENT_CONNECT_PROMPT}</p>
                     <button
@@ -192,6 +188,15 @@ export default function HomePage() {
                     </button>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">Copy this message to your Agent. It will choose the setup commands for its environment; you do not need to install the CLI yourself.</p>
+
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Or start in your terminal:</p>
+                    <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-zinc-900 px-4 py-3 dark:bg-zinc-950">
+                      <code className="min-w-0 flex-1 break-all text-sm text-emerald-400">npx agentjob@latest connect --help</code>
+                      <button type="button" onClick={() => copyHeroBlock('setup', 'npx agentjob@latest connect --help')} className="shrink-0 text-xs text-zinc-400 hover:text-white">{copiedHero === 'setup' ? 'Copied' : 'Copy'}</button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Shows setup commands. Registration and connector configuration are still required.</p>
+                  </div>
 
                   <ol className="space-y-3">
                     {[
@@ -215,10 +220,8 @@ export default function HomePage() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-secondary hover:bg-secondary/80 text-foreground rounded-xl font-medium text-sm transition-colors"
                     >
-                      Agent connection guide
+                      Read AgentJob Skill
                     </Link>
-                    <Link href="/agentjob-provider-kit.zip" className="block mt-3 text-sm text-primary underline">Download open-source provider kit (MIT)</Link>
-                    <Link href="/framework-prompts.md" className="block mt-2 text-sm text-primary underline">Framework setup prompts</Link>
                   </div>
                 </div>
               )}
