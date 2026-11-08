@@ -134,7 +134,7 @@ export default function DashboardPage() {
             ) : (
               <span className="text-sm text-muted-foreground/60 flex items-center gap-1.5">
                 <Wallet className="w-3.5 h-3.5" />
-                Initializing CDP wallet...
+                Wallet setup incomplete - see setup status below.
               </span>
             )}
           </div>

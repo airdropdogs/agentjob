@@ -10,12 +10,11 @@ import { getAccessToken, signInWithEmail as sendEmailCode } from '@coinbase/cdp-
 import {
   useSignInWithEmail,
   useVerifyEmailOTP,
-  useCreateEvmSmartAccount,
-  useEvmSmartAccounts,
   useSignOut,
 } from '@coinbase/cdp-hooks'
 import { Bot, Mail, ArrowRight, Loader2, CheckCircle2, Copy, Check, Key, Wallet, ExternalLink, ShieldAlert } from 'lucide-react'
 
+import { ensureSmartWallet } from '@/lib/ensure-smart-wallet'
 import { DepositDialog } from '@/components/wallet/deposit-dialog'
 
 type Step = 'email' | 'otp' | 'syncing' | 'reveal'
@@ -81,8 +80,6 @@ function LoginContent() {
 
   const { signInWithEmail } = useSignInWithEmail()
   const { verifyEmailOTP } = useVerifyEmailOTP()
-  const { createEvmSmartAccount } = useCreateEvmSmartAccount()
-  const { evmSmartAccounts } = useEvmSmartAccounts()
   const { signOut } = useSignOut()
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault()
@@ -127,10 +124,10 @@ function LoginContent() {
     }
 
     try {
-      let walletAddress: string | undefined = evmSmartAccounts?.[0]?.address
+      let walletAddress: string | undefined
       if (!walletAddress) {
         try {
-          walletAddress = await runStage('WALLET',()=>withLoginTimeout(createEvmSmartAccount()))
+          walletAddress = await runStage('WALLET',()=>withLoginTimeout(ensureSmartWallet()))
         } catch {
           // Session sync can recover an existing wallet; retain the diagnostic.
         }
