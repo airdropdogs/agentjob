@@ -76,20 +76,26 @@ function LoginContent() {
   const [walletCopied, setWalletCopied] = useState(false)
   const sendingCode = useRef(false)
   const [isSendingCode, setIsSendingCode] = useState(false)
+  const [resendAt, setResendAt] = useState(0)
+  const [resendSeconds, setResendSeconds] = useState(0)
+  useEffect(() => {
+    const update = () => setResendSeconds(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000)))
+    update()
+    if (!resendAt) return
+    const timer = setInterval(update, 1000)
+    return () => clearInterval(timer)
+  }, [resendAt])
 
   const { signInWithEmail } = useSignInWithEmail()
   const { verifyEmailOTP } = useVerifyEmailOTP()
   const { signOut } = useSignOut()
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault()
-    if (sendingCode.current) return
+    if (sendingCode.current || Date.now() < resendAt) return
     sendingCode.current = true
     setIsSendingCode(true)
-    setOtp('')
-    setFlowId('')
     setError('')
-    setStep('email')
-    setDiagnostics([]);setDiagnosticCopy('')
+    setDiagnosticCopy('')
     try {
       const result = await runStage('SEND',()=>withLoginTimeout((async () => {
         try { return await signInWithEmail({ email: email.trim() }) }
@@ -100,6 +106,8 @@ function LoginContent() {
           return sendEmailCode({ email: email.trim() })
         }
       })()))
+      setOtp('')
+      setResendAt(Date.now() + 60_000)
       setFlowId(result.flowId)
       setStep('otp')
     } catch (error) {
@@ -171,7 +179,7 @@ function LoginContent() {
     }
   }
 
-  const isLoading = step === 'syncing'
+  const isLoading = step === 'syncing' || isSendingCode
 
   const copyToClipboard = useCallback(async (text: string, which: 'key' | 'wallet') => {
     try {
@@ -217,8 +225,8 @@ function LoginContent() {
                 {redirectTo === '/onramp' ? 'Continue to Coinbase checkout' : 'Continue to Dashboard'}
               </button>
 
-              <details className="min-w-0 space-y-4">
-                <summary className="cursor-pointer text-sm text-muted-foreground">Connect your own Agent (optional)</summary>
+              <section className="min-w-0 space-y-4">
+                <h2 className="text-sm font-medium">Connect your own Agent (optional)</h2>
               <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
                 <ShieldAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
@@ -257,7 +265,7 @@ function LoginContent() {
                 </p>
               </div>
 
-              </details>
+              </section>
 
               {newWalletAddress && (
                 <div className="bg-card border border-border/40 rounded-xl p-4 space-y-2">
@@ -335,7 +343,7 @@ function LoginContent() {
                         placeholder="your@email.com"
                         required
                         autoFocus
-                        className="w-full pl-9 pr-4 py-2.5 bg-secondary border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                        className="w-full pl-9 pr-4 py-2.5 bg-secondary border border-border rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
                       />
                     </div>
                   </div>
@@ -344,7 +352,7 @@ function LoginContent() {
 
                   <button
                     type="submit"
-                    disabled={!email || isSendingCode}
+                    disabled={!email || isSendingCode || resendSeconds > 0}
                     className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl font-medium transition-colors"
                   >
                     <ArrowRight className="w-4 h-4" />
@@ -355,6 +363,7 @@ function LoginContent() {
 
               {(step === 'otp' || step === 'syncing') && (
                 <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <p className="text-xs leading-relaxed text-muted-foreground">Code requested. Email delivery may take a few minutes. Check your spam folder and wait before requesting another code. If several emails arrive, use the code from your latest request.</p>
                   <div>
                     <label className="block text-sm font-medium mb-2">6-digit code</label>
                     <input
@@ -397,6 +406,9 @@ function LoginContent() {
                     )}
                   </button>
 
+                  <button type="button" disabled={isLoading || resendSeconds > 0} onClick={handleSendOtp} className="w-full text-sm text-primary disabled:opacity-50">
+                    {isSendingCode ? 'Sending code...' : resendSeconds > 0 ? `Resend code in ${resendSeconds}s` : 'Resend code'}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -407,7 +419,7 @@ function LoginContent() {
                     disabled={isLoading}
                     className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                   >
-                    Request a new code / use a different email
+                    Use a different email
                   </button>
                 </form>
               )}
