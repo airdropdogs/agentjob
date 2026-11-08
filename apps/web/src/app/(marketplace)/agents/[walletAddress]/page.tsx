@@ -97,6 +97,26 @@ export default function AgentDetailPage() {
   const chatHref = `/chat/${canonicalId}`
   const status = STATUS_CONFIG[agent.onlineStatus] ?? STATUS_CONFIG.offline
 
+  const chatButton = (
+            <button
+              onClick={() => router.push(chatHref)}
+              disabled={!agent.online}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer',
+                agent.onlineStatus === 'online'
+                  ? 'bg-primary hover:bg-primary/90 text-white'
+                  : agent.onlineStatus === 'busy'
+                  ? 'bg-amber-500/10 text-amber-600 cursor-not-allowed'
+                  : 'bg-muted text-muted-foreground cursor-not-allowed'
+              )}
+            >
+              <MessageSquare className="w-4 h-4" />
+              {agent.onlineStatus === 'online' ? 'Start chat'
+                : agent.onlineStatus === 'busy' ? 'Busy—try later'
+                : 'Offline'}
+            </button>
+  )
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Link href="/agents"
@@ -107,7 +127,7 @@ export default function AgentDetailPage() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 min-w-0 space-y-4">
 
           {/* Profile card */}
           <div className="bg-card border border-border/40 rounded-2xl p-6">
@@ -117,7 +137,7 @@ export default function AgentDetailPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl font-bold">{agent.name}</h1>
+                  <h1 className="text-2xl font-bold break-words min-w-0">{agent.name}</h1>
                   {agent.hasReputationNft && (
                     <span className="flex items-center gap-1 text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
                       <CheckCircle2 className="w-3 h-3" />Rep NFT
@@ -150,6 +170,11 @@ export default function AgentDetailPage() {
               </div>
             </div>
 
+            <div className="mb-4 space-y-2 lg:hidden">
+              {chatButton}
+              <p className="text-xs text-muted-foreground">{formatUsdc(agent.priceSubsequent)} USDC / message ? Up to {agent.effectiveFreeDailyMax > 0 ? agent.effectiveFreeMessagesPerUser : 0} free / user</p>
+            </div>
+
             {/* Bio */}
             {agent.bio && (
               <p className="text-sm text-muted-foreground bg-secondary/50 rounded-xl px-4 py-2.5 mb-4">
@@ -159,7 +184,7 @@ export default function AgentDetailPage() {
 
             {/* Description */}
             {agent.description && (
-              <p className="text-sm text-muted-foreground leading-relaxed mb-4">{agent.description}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed break-words mb-4">{agent.description}</p>
             )}
 
             {/* Tags */}
@@ -250,23 +275,7 @@ export default function AgentDetailPage() {
               <p className="text-xs leading-relaxed text-muted-foreground">Per-user allowance is shared across all chats with this Agent. Daily slots are shared by all users and reset at 00:00 UTC. Your platform limit is {agent.freeUserDailyLimit} free messages per UTC day. Availability is checked before sending.</p>
             </div>
 
-            <button
-              onClick={() => router.push(chatHref)}
-              disabled={!agent.online}
-              className={cn(
-                'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition-colors',
-                agent.onlineStatus === 'online'
-                  ? 'bg-primary hover:bg-primary/90 text-white'
-                  : agent.onlineStatus === 'busy'
-                  ? 'bg-amber-500/10 text-amber-600 cursor-not-allowed'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed'
-              )}
-            >
-              <MessageSquare className="w-4 h-4" />
-              {agent.onlineStatus === 'online' ? 'Start chat'
-                : agent.onlineStatus === 'busy' ? 'Busy—try later'
-                : 'Offline'}
-            </button>
+            <div className="hidden lg:block">{chatButton}</div>
 
             {agent.onlineStatus === 'busy' && (
               <p className="text-xs text-amber-500/80 text-center mt-2 flex items-center justify-center gap-1">

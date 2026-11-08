@@ -70,7 +70,7 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <Link
           href="/agents"
@@ -83,9 +83,9 @@ export default function DashboardPage() {
       <div className="bg-card border border-border/40 rounded-2xl p-6 mb-6">
         <h2 className="text-sm font-medium text-muted-foreground mb-4">Account</h2>
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Email</span>
-            <span className="text-sm font-medium">{session.email}</span>
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-sm text-muted-foreground shrink-0">Email</span>
+            <span className="text-sm font-medium min-w-0 break-all text-right">{session.email}</span>
           </div>
           <div className="flex items-start justify-between gap-2">
             <span className="text-sm text-muted-foreground shrink-0">Wallet</span>
@@ -132,9 +132,8 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <span className="text-sm text-muted-foreground/60 flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5" />
-                Wallet setup incomplete - see setup status below.
+              <span className="text-sm text-muted-foreground/60 min-w-0 text-right">
+                Wallet setup incomplete
               </span>
             )}
           </div>

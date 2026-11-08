@@ -74,7 +74,6 @@ function LoginContent() {
   const [newWalletAddress, setNewWalletAddress] = useState<string | null>(null)
   const [keyCopied, setKeyCopied] = useState(false)
   const [walletCopied, setWalletCopied] = useState(false)
-  const [savedConfirmed, setSavedConfirmed] = useState(false)
   const sendingCode = useRef(false)
   const [isSendingCode, setIsSendingCode] = useState(false)
 
@@ -190,12 +189,12 @@ function LoginContent() {
   }, [])
 
   const handleContinueToDashboard = useCallback(() => {
-    if (savedConfirmed) window.location.assign(redirectTo)
-  }, [savedConfirmed, redirectTo])
+    window.location.assign(redirectTo)
+  }, [redirectTo])
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-[calc(100vh-4rem)] flex items-start sm:items-center justify-center px-4 py-8">
+      <div className="w-full min-w-0 max-w-sm">
         {step === 'reveal' && newApiKey ? (
           <>
             <div className="text-center mb-6">
@@ -203,18 +202,28 @@ function LoginContent() {
                 <Key className="w-8 h-8 text-amber-500" />
               </div>
               <h1 className="text-2xl font-bold">You&apos;re in</h1>
-              <p className="text-muted-foreground text-sm mt-2">
-                Your Agent API Key is shown below.{' '}
-                <span className="text-amber-500 font-medium">We only show it once.</span>
+              <p className="text-muted-foreground text-sm mt-2 break-words">
+                You are signed in. Chat with Agents or set up your own Agent later.
               </p>
             </div>
 
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
+              <button
+                type="button"
+                onClick={handleContinueToDashboard}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary/90 cursor-pointer text-white rounded-xl font-medium transition-colors"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {redirectTo === '/onramp' ? 'Continue to Coinbase checkout' : 'Continue to Dashboard'}
+              </button>
+
+              <details className="min-w-0 space-y-4">
+                <summary className="cursor-pointer text-sm text-muted-foreground">Connect your own Agent (optional)</summary>
               <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
                 <ShieldAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
                   This key controls your agent and authorizes USDC payouts.{' '}
-                  <strong>Copy and store it now</strong>—you cannot view it again after leaving this screen.
+                  Save it if you plan to connect an Agent. It is shown once; you can reset it later in Agent settings.
                 </p>
               </div>
 
@@ -243,10 +252,12 @@ function LoginContent() {
                   {newApiKey}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  In your MCP config <code className="bg-secondary px-1 rounded">env</code>, set{' '}
+                  In your connector config <code className="bg-secondary px-1 rounded">env</code>, set{' '}
                   <code className="bg-secondary px-1 rounded">AGENTJOB_API_KEY</code>
                 </p>
               </div>
+
+              </details>
 
               {newWalletAddress && (
                 <div className="bg-card border border-border/40 rounded-xl p-4 space-y-2">
@@ -281,28 +292,6 @@ function LoginContent() {
 
               <button type="button" className="text-sm text-primary hover:underline" onClick={() => setDepositOpen(true)}>Add USDC</button>
               <DepositDialog open={depositOpen} onOpenChange={setDepositOpen} address={newWalletAddress} />
-
-              <label className="flex items-start gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={savedConfirmed}
-                  onChange={(e) => setSavedConfirmed(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-primary shrink-0"
-                />
-                <span className="text-sm text-muted-foreground leading-relaxed">
-                  I have saved my API Key somewhere safe and understand I cannot see it again.
-                </span>
-              </label>
-
-              <button
-                type="button"
-                onClick={handleContinueToDashboard}
-                disabled={!savedConfirmed}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-40 text-white rounded-xl font-medium transition-colors"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                {redirectTo === '/onramp' ? 'Continue to Coinbase checkout' : 'Continue to Dashboard'}
-              </button>
 
               <a
                 href="/dashboard/agent"
