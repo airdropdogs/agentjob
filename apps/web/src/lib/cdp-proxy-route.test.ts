@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { GET, POST } from '../app/api/cdp/[...path]/route'
+import { GET, POST, PUT } from '../app/api/cdp/[...path]/route'
 
 test('relay rejects disabled access, wrong projects, cross-origin and oversized bodies before upstream', async () => {
   const previous = process.env.CDP_PROXY_TRIAL_ENABLED
@@ -14,6 +14,10 @@ test('relay rejects disabled access, wrong projects, cross-origin and oversized 
     assert.equal((await GET(new Request(url.replace('test-project', 'other')))).status, 404)
     assert.equal((await POST(new Request(url, { method: 'POST', headers: { origin: 'https://evil.example' } }))).status, 403)
     assert.equal((await POST(new Request(url, { method: 'POST', headers: { origin: 'https://agent-job.ai', 'content-type': 'application/json' }, body: 'x'.repeat(131073) }))).status, 413)
+    const walletUrl = url.replace('auth/init', 'end-users/user/wallet-secrets')
+    assert.equal((await PUT(new Request(walletUrl, { method: 'PUT', headers: { origin: 'https://evil.example' } }))).status, 403)
+    assert.equal((await PUT(new Request(walletUrl, { method: 'PUT', headers: { origin: 'https://agent-job.ai', 'content-type': 'application/json' }, body: 'x'.repeat(131073) }))).status, 413)
+    assert.equal((await PUT(new Request(walletUrl, { method: 'PUT', headers: { origin: 'https://agent-job.ai', 'content-type': 'application/json' }, body: 'invalid' }))).status, 400)
   } finally {
     if (previous === undefined) delete process.env.CDP_PROXY_TRIAL_ENABLED
     else process.env.CDP_PROXY_TRIAL_ENABLED = previous

@@ -4,8 +4,9 @@ export function allowedCdpPath(path: string, method: string, project: string): b
   if (!project || !path.startsWith(ROOT + project + '/')) return false
   const tail = path.slice((ROOT + project + '/').length)
   if (method === 'GET') return /^(config|auth\/mfa|end-users\/[a-zA-Z0-9-]+)$/.test(tail)
+  if (method === 'PUT') return /^end-users\/[a-zA-Z0-9-]+\/wallet-secrets$/.test(tail)
   if (method !== 'POST') return false
-  return /^(auth\/(init|verify\/email|refresh|logout)|end-users\/[a-zA-Z0-9-]+\/(wallet-secrets|evm|evm\/smart-accounts|evm\/sign\/(message|typed-data)))$/.test(tail)
+  return /^(auth\/(init|verify\/email|refresh|logout)|end-users\/[a-zA-Z0-9-]+\/(evm|evm\/smart-accounts|evm\/sign\/(message|typed-data)))$/.test(tail)
 }
 
 export function cdpProxyUrl(input: string, method: string, origin: string, project: string): string | null {

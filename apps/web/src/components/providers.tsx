@@ -60,7 +60,7 @@ function WalletSyncer() {
   const { data: session } = useQuery<{ userId?: string; wallet?: string } | null>({
     queryKey: ['session'],
     queryFn: async () => {
-      const res = await fetch('/api/auth/session')
+      const res = await fetch('/api/auth/session', { signal: AbortSignal.timeout(30_000) })
       return res.ok ? (await res.json()).data : null
     },
   })
@@ -75,8 +75,9 @@ function WalletSyncer() {
       const token = await withLoginTimeout(getAccessToken())
       if (!token) throw new Error('WALLET_SIGN_IN_REQUIRED: Please sign in again to finish wallet setup.')
       await bindWallet(wallet, token)
-      await qc.invalidateQueries({ queryKey: ['session'] })
-      await qc.invalidateQueries({ queryKey: ['wallet-balance'] })
+      // Unrelated active queries must not keep the setup action disabled indefinitely.
+      void qc.invalidateQueries({ queryKey: ['session'] })
+      void qc.invalidateQueries({ queryKey: ['wallet-balance'] })
       return wallet
     },
   })

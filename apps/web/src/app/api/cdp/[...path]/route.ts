@@ -26,7 +26,7 @@ async function relay(req: Request) {
     if (value) upstreamHeaders.set(name, value)
   }
   let body: string | undefined
-  if (req.method === 'POST') {
+  if (req.method === 'POST' || req.method === 'PUT') {
     const allowEmpty = /\/auth\/(refresh|logout)$/.test(path)
     if (!allowEmpty && !req.headers.get('content-type')?.startsWith('application/json')) return fail('CDP_PROXY_JSON_REQUIRED', 415)
     // Bounded streaming read; Content-Length is not trusted.
@@ -94,3 +94,4 @@ async function relay(req: Request) {
 
 export const GET = relay
 export const POST = relay
+export const PUT = relay
