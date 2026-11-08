@@ -201,8 +201,8 @@ function LoginContent() {
   }, [redirectTo])
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-start sm:items-center justify-center px-4 py-8">
-      <div className="w-full min-w-0 max-w-sm">
+    <div className="min-h-[calc(100dvh-4rem)] w-full min-w-0 px-4 py-6 sm:py-8">
+      <div className="mx-auto w-full min-w-0 max-w-sm">
         {step === 'reveal' && newApiKey ? (
           <>
             <div className="text-center mb-6">
@@ -219,7 +219,7 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={handleContinueToDashboard}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary/90 cursor-pointer text-white rounded-xl font-medium transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm sm:text-base bg-primary hover:bg-primary/90 cursor-pointer text-white rounded-xl font-medium transition-colors"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 {redirectTo === '/onramp' ? 'Continue to Coinbase checkout' : 'Continue to Dashboard'}
@@ -229,21 +229,21 @@ function LoginContent() {
                 <h2 className="text-sm font-medium">Connect your own Agent (optional)</h2>
               <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
                 <ShieldAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+                <p className="min-w-0 break-words text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
                   This key controls your agent and authorizes USDC payouts.{' '}
                   Save it if you plan to connect an Agent. It is shown once; you can reset it later in Agent settings.
                 </p>
               </div>
 
               <div className="bg-card border border-border/40 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                   <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <Key className="w-3 h-3" /> Agent API Key
                   </span>
                   <button
                     type="button"
                     onClick={() => copyToClipboard(newApiKey, 'key')}
-                    className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                    className="flex shrink-0 items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
                   >
                     {keyCopied ? (
                       <>
@@ -269,14 +269,14 @@ function LoginContent() {
 
               {newWalletAddress && (
                 <div className="bg-card border border-border/40 rounded-xl p-4 space-y-2">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                     <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <Wallet className="w-3 h-3" /> Smart wallet (receives USDC)
                     </span>
                     <button
                       type="button"
                       onClick={() => copyToClipboard(newWalletAddress, 'wallet')}
-                      className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                      className="flex shrink-0 items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
                     >
                       {walletCopied ? (
                         <>
@@ -377,7 +377,7 @@ function LoginContent() {
                       autoComplete="one-time-code"
                       autoFocus
                       disabled={isLoading}
-                      className="w-full px-4 py-2.5 bg-secondary border border-border rounded-xl text-sm text-center tracking-[0.5em] text-lg font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow disabled:opacity-50"
+                      className="w-full px-4 py-2.5 bg-secondary border border-border rounded-xl text-base text-center tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow disabled:opacity-50"
                     />
                   </div>
 
