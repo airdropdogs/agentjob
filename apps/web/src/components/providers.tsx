@@ -16,14 +16,9 @@ const CDP_PROJECT_ID = process.env.NEXT_PUBLIC_CDP_PROJECT_ID!
 export function Providers({ children }: { children: React.ReactNode }) {
   const [transportReady, setTransportReady] = useState(false)
   useEffect(() => {
-    const option = new URLSearchParams(window.location.search).get('cdp_proxy')
-    let enabled = option !== '0'
-    try {
-      if (option === '1' || option === '0') sessionStorage.setItem('agentjob_cdp_transport', option)
-      enabled = sessionStorage.getItem('agentjob_cdp_transport') !== '0'
-      sessionStorage.setItem('agentjob_cdp_transport', enabled ? '1' : '0')
-    } catch { /* Query parameter still works when session storage is unavailable. */ }
-    const restore = enabled ? installCdpProxy(CDP_PROJECT_ID) : undefined
+    // Production always uses the same-origin transport; discard persisted trial opt-outs.
+    try { sessionStorage.setItem('agentjob_cdp_transport', '1') } catch { /* Storage is optional. */ }
+    const restore = installCdpProxy(CDP_PROJECT_ID)
     setTransportReady(true)
     return restore
   }, [])

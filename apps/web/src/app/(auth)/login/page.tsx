@@ -64,7 +64,7 @@ function LoginContent() {
     } catch (error) {
       const detail = loginDiagnostic(stage, Date.now() - started, error)
       setDiagnostics(d => [...d, detail].slice(-20))
-      throw new Error(detail.message)
+      throw new Error(`${detail.code}: ${detail.message}`)
     } finally {
       stageRef.current = null
       setActiveStage(null)
@@ -420,7 +420,7 @@ function LoginContent() {
             </p>
           </>
         )}
-        {searchParams.get('debug') === '1' && <details className="mt-4 rounded-xl border p-3 text-xs"><summary className="cursor-pointer">Sign-in diagnostics</summary>
+        {(!!error || searchParams.get('debug') === '1') && <details className="mt-4 rounded-xl border p-3 text-xs"><summary className="cursor-pointer">Sign-in diagnostics</summary>
           <p className="mt-2 text-muted-foreground">Copy this report for support. It excludes your email, verification code, wallet address and authentication tokens. A successful send request does not confirm email delivery. Request paths are redacted; pending requests may still be running after a timeout.</p>
           {activeStage&&<p role="status" className="mt-2">Current step: {activeStage}</p>}
           <textarea readOnly aria-label="Sign-in diagnostic report" className="mt-2 h-40 w-full rounded border bg-background p-2 font-mono" value={diagnosticReport()}/>
