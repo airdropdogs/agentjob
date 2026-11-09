@@ -72,7 +72,7 @@ export async function createWithdrawal(agentId: string, input: ReturnType<typeof
     row = (await db.query(`INSERT INTO provider_withdrawals
       (id,user_id,agent_id,idempotency_key,source_address,to_address,amount_units,status)
       VALUES ($1,$2,$3,$4,$5,$6,$7,'submitting') RETURNING *`,
-    [randomUUID(), owner.id, agentId, input.key, owner.wallet.toLowerCase(), input.to, input.units.toString()])).rows[0]
+    [randomUUID(), owner.id, agentId, input.key, owner.wallet, input.to, input.units.toString()])).rows[0]
     await db.query('COMMIT')
   } catch (error) {
     await db.query('ROLLBACK')

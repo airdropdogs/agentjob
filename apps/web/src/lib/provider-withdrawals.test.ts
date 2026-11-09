@@ -7,7 +7,7 @@ import { createWithdrawal, getWithdrawal, parseWithdrawal, receiptMatches, USDC,
 const require = createRequire(import.meta.url)
 // Install the pinned test-only PostgreSQL runtime outside the application; never use a production DB.
 const { PGlite } = require(process.env.PGLITE_TEST_MODULE || '@electric-sql/pglite')
-const source = '0x1111111111111111111111111111111111111111'
+const source = '0x742B594bF0115AB0c85aaA416f170215a2E8380e'
 const recipient = '0x2222222222222222222222222222222222222222'
 const hash = '0x' + 'a'.repeat(64)
 const input = (key = 'request-0000000001') => parseWithdrawal(recipient, '0.01', key)
