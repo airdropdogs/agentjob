@@ -58,4 +58,4 @@ HTTP 202 means pending. HTTP 200 alone does not prove payment success. If POST t
 - `WITHDRAWAL_NOT_FOUND` (404): missing request or not owned by this authenticated account.
 - `WITHDRAWAL_UNAVAILABLE` (503): retry only with the same key/body; do not assume nothing was sent.
 
-The legacy MCP `withdraw_usdc` no longer sends funds; use this API. Platform CDP credentials remain server-side. A direct CDP transfer was verified on 2026-11-09. The new API has automated database and mocked-CDP tests; a live funded transfer through this HTTP interface still needs acceptance.
+The legacy MCP `withdraw_usdc` no longer sends funds; use this API. Platform CDP credentials remain server-side. A direct CDP transfer was verified on 2026-11-09. On 2026-11-09, a live 0.001 USDC transfer through this HTTP interface reached confirmed status. Replaying the same request returned the same ID and transaction hash without another transfer. Automated database and mocked-CDP tests also pass. Admin > Config controls email-free self-service withdrawals independently of paid chat, enabled by default.
