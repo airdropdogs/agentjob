@@ -8,14 +8,13 @@ import {
   agentProfiles, agentChatTasks, agentSkillTags, agentFrameworkTags, agentRuntimeTags,
   skillTags, frameworkTags, runtimeTags, modelTags, agentTypeTags,
   chats, messages as messagesTable,
-  users, agentDailyStats, userWalletSettings,
+  users, agentDailyStats,
 } from '@agentjob/db'
 import { eq, and, asc, desc, inArray, count, sql } from 'drizzle-orm'
 import { FREE_SLOT_WARNING_RATIO } from '@agentjob/shared'
 import { isAgentOnlineByHeartbeat } from './agent-auth'
 import { getPlatformConfig } from './platform-config'
 import { hasSensitiveWords, generateRandomAgentName, generateApiKey, hashApiKey } from './utils'
-import { getCdpClient } from './cdp-client'
 import {
   cacheGetJson,
   rateLimitIdHash,
@@ -23,13 +22,6 @@ import {
   idempotencyStringGet,
   idempotencyStringSet,
 } from './rate-limit'
-
-/** Convert a human-readable USDC amount ("10.5") to a 6-decimal BigInt. */
-function parseUsdcUnits(amount: string): bigint {
-  const [integer = '0', fraction = ''] = amount.split('.')
-  const padded = fraction.padEnd(6, '0').slice(0, 6)
-  return BigInt(integer + padded)
-}
 
 const TASK_TIMEOUT_MS = Number(process.env.TASK_TIMEOUT_MINUTES ?? '30') * 60 * 1_000
 const MAX_WAIT_SECS   = 60
@@ -874,106 +866,11 @@ export async function createMcpServer(agent: AuthAgent) {
   server.registerTool(
     'withdraw_usdc',
     {
-      description:
-        'Transfer USDC from this agent\'s wallet to an external address. ' +
-        'Only available to Server Wallet agents (wallet_type = server_wallet). ' +
-        'Subject to the platform cooldown period (same as email_wallet agents). ' +
-        'Gas is covered by CDP Paymaster — no ETH required. ' +
-        'Minimum transfer amount is set by the platform (default 1 USDC).',
-      inputSchema: z.object({
-        toAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe('Destination EVM address'),
-        amount: z.string().regex(/^\d+(\.\d+)?$/).describe('Amount in USDC (e.g. "10.5")'),
-      }),
+      description: 'Use POST /api/agents/me/withdrawals with an Idempotency-Key for USDC withdrawals. This legacy tool does not transfer funds.',
+      inputSchema: z.object({ toAddress: z.string(), amount: z.string() }),
     },
-    async ({ toAddress, amount }) => {
-      const mcpErr = (msg: string) => ({
-        isError: true,
-        content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: msg }) }],
-      })
-
-      if (process.env.ENABLE_REAL_PAYMENTS !== 'true') {
-        return mcpErr('Transfers are temporarily unavailable')
-      }
-
-      const db = getDb()
-
-      // Load user to check wallet type and cooldown
-      const ownerUser = await db.query.users.findFirst({
-        where: eq(users.id, (await db.query.agentProfiles.findFirst({
-          where: eq(agentProfiles.id, agent.id),
-          columns: { userId: true },
-        }))!.userId),
-      })
-
-      if (!ownerUser) return mcpErr('Agent user not found.')
-      if (ownerUser.walletType !== 'server_wallet') {
-        return mcpErr('withdraw_usdc is only available to Server Wallet agents. Email-wallet agents must use the Dashboard.')
-      }
-      if (!ownerUser.cdpAccountName) return mcpErr('No CDP account name found. Please re-register.')
-
-      // Cooldown check
-      const config = await getPlatformConfig()
-      const settings = await db.query.userWalletSettings.findFirst({
-        where: eq(userWalletSettings.userId, ownerUser.id),
-      })
-      if (settings?.lastUsdcTransferAt) {
-        const cooldownMs = config.walletTransferCooldownDays * 24 * 60 * 60 * 1_000
-        const nextAllowed = new Date(settings.lastUsdcTransferAt.getTime() + cooldownMs)
-        if (nextAllowed > new Date()) {
-          return mcpErr(`Transfer on cooldown. Next allowed at: ${nextAllowed.toISOString()}`)
-        }
-      }
-
-      // Minimum amount check
-      const amountNum = parseFloat(amount)
-      if (isNaN(amountNum) || amountNum < config.walletTransferMinUsdc) {
-        return mcpErr(`Minimum transfer amount is ${config.walletTransferMinUsdc} USDC.`)
-      }
-
-      // Execute transfer via CDP Smart Account + Paymaster
-      try {
-        const cdp = getCdpClient()
-        const ownerAccount = await cdp.evm.getOrCreateAccount({ name: ownerUser.cdpAccountName })
-        const smartAccount = await cdp.evm.getOrCreateSmartAccount({
-          name: `${ownerUser.cdpAccountName}-smart`,
-          owner: ownerAccount,
-        })
-
-        const { userOpHash } = await smartAccount.transfer({
-          to: toAddress as `0x${string}`,
-          amount: parseUsdcUnits(amount),
-          token: 'usdc',
-          network: 'base',
-          paymasterUrl: process.env.CDP_PAYMASTER_URL,
-        })
-
-        // Update last transfer timestamp
-        const now = new Date()
-        const nextTransferAt = new Date(now.getTime() + config.walletTransferCooldownDays * 24 * 60 * 60 * 1_000)
-        await db
-          .insert(userWalletSettings)
-          .values({ userId: ownerUser.id, lastUsdcTransferAt: now })
-          .onConflictDoUpdate({
-            target: userWalletSettings.userId,
-            set: { lastUsdcTransferAt: now, updatedAt: now },
-          })
-
-        return {
-          content: [{
-            type: 'text' as const,
-            text: JSON.stringify({
-              ok: true,
-              userOpHash,
-              nextTransferAt: nextTransferAt.toISOString(),
-              message: `Transfer of ${amount} USDC submitted. UserOp hash: ${userOpHash}`,
-            }, null, 2),
-          }],
-        }
-      } catch (e) {
-        console.error('[withdraw_usdc] transfer failed:', e)
-        return mcpErr('Transfer failed. Please check your balance and try again.')
-      }
-    }
+    async () => ({ isError: true, content: [{ type: 'text' as const,
+      text: 'Use POST https://agent-job.ai/api/agents/me/withdrawals with your Provider Key, a persistent Idempotency-Key, and {toAddress,amount}. Check the returned withdrawal ID via GET /api/agents/me/withdrawals/{id}. Base ETH is required in the registered server wallet.' }] }),
   )
 
   return server
