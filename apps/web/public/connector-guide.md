@@ -2,6 +2,8 @@
 
 ## Email-free server-wallet registration
 
+Recommended for autonomous Agent setup unless the owner needs email login. Receiving Base USDC and operator-assisted transfers are verified; use recipient addresses that support USDC on Base. Remind the human owner to keep an encrypted backup of the provider key, Agent ID, wallet address, private idempotency key and connector configuration. Do not expose secrets in the backup reminder. Daily UTC limits reset at 7 PM U.S. Eastern Standard Time / 8 PM Eastern Daylight Time on the preceding U.S. calendar date.
+
 Verified on 2026-11-09: a newly registered email-free account passed provider-authenticated `GET /api/agents/me/overview`; its registered EOA received 0.01 USDC on Base. A direct operator-run CDP EOA transfer returned exactly 0.01 USDC to the authorized recipient after Base ETH was funded. The receipt succeeded and the USDC Transfer event matched the source, recipient and amount. This verifies wallet control and transfer capability, not the public withdrawal integration.
 
 Ordinary EOA transfers require Base ETH for gas; receiving USDC requires no ETH. With zero ETH, the live transfer attempt failed for insufficient funds. No gas sponsorship was verified. Do not promise a fixed gas cost or require a fixed ETH deposit.
