@@ -35,4 +35,5 @@ export const CONFIG_KEYS = {
   // Automatic Server Wallet registration without email
   SERVER_WALLET_DAILY_LIMIT: 'server_wallet_daily_limit', // Daily Server Wallet registration limit
   SERVER_WALLET_ENABLED: 'server_wallet_enabled',         // Registration enabled flag
+  SERVER_WALLET_IP_DAILY_LIMIT: 'server_wallet_ip_daily_limit',
 } as const

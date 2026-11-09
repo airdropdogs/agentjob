@@ -54,13 +54,13 @@ return tonumber(ARGV[3]) + 1
 
 export function createLimiter(redis: RedisStore, prefix: string, maximum: number, windowMs: number, sliding = false) {
   return {
-    async limit(id: string) {
+    async limit(id: string, configuredMaximum = maximum) {
       const now = Date.now()
       const reset = (Math.floor(now / windowMs) + 1) * windowMs
       const count = Number(sliding
-        ? await redis.client.eval(SLIDING_WINDOW, 1, `${prefix}:${id}`, now, windowMs, maximum, randomUUID())
+        ? await redis.client.eval(SLIDING_WINDOW, 1, `${prefix}:${id}`, now, windowMs, configuredMaximum, randomUUID())
         : await redis.client.eval(FIXED_WINDOW, 1, `${prefix}:${Math.floor(now / windowMs)}:${id}`, reset - now))
-      return { success: count <= maximum, limit: maximum, remaining: Math.max(0, maximum - count), reset: sliding ? now + windowMs : reset, pending: Promise.resolve() }
+      return { success: count <= configuredMaximum, limit: configuredMaximum, remaining: Math.max(0, configuredMaximum - count), reset: sliding ? now + windowMs : reset, pending: Promise.resolve() }
     },
   }
 }

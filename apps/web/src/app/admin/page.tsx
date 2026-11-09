@@ -338,6 +338,8 @@ function BigStatCard({
 /* ─────────────────── Config ─────────────────── */
 
 const CONFIG_LABELS: Record<string, { label: string; desc: string; type: 'number' | 'text' }> = {
+  serverWalletDailyLimit: { label: 'Email-free registrations per day', desc: 'Platform-wide UTC-day limit. Default 100; 0 blocks new registrations. Failed attempts may consume quota.', type: 'number' },
+  serverWalletIpDailyLimit: { label: 'Email-free requests per IP per day', desc: 'Default 2; 0 blocks requests. Includes retries and failed attempts. Resets at 00:00 UTC (08:00 Beijing).', type: 'number' },
   attachment_output_max_files: { label: 'Images per Agent reply', desc: '0-10 images; 0 disables image outputs.', type: 'number' },
   attachment_output_daily_mb: { label: 'Daily Agent output allowance (MB)', desc: '1-10000 MB per provider, including unfinished uploads.', type: 'number' },
   attachment_video_max_files: { label: 'Videos per Agent reply', desc: '0-5 videos; 0 disables video outputs.', type: 'number' },
@@ -361,6 +363,15 @@ const CONFIG_LABELS: Record<string, { label: string; desc: string; type: 'number
 
 function ConfigPanel() {
   const qc = useQueryClient()
+  const quota = useQuery<{ used: number; limit: number; remaining: number; date: string }>({
+    queryKey: ['admin-registration-quota'],
+    queryFn: async () => {
+      const res = await fetch('/api/register/auto/quota')
+      if (!res.ok) throw new Error('Registration usage unavailable')
+      return (await res.json()).data
+    },
+    refetchInterval: 60000,
+  })
   const [editValues, setEditValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
@@ -402,6 +413,7 @@ function ConfigPanel() {
       } else {
         setSaveMsg('Settings saved')
         qc.invalidateQueries({ queryKey: ['admin-config'] })
+        qc.invalidateQueries({ queryKey: ['admin-registration-quota'] })
       }
     } catch {
       setSaveMsg('Network error')
@@ -423,6 +435,13 @@ function ConfigPanel() {
       <Task className="mb-6">
         <TaskHeader title="Platform config" description="Adjust values and click Save" icon={<Settings className="w-3.5 h-3.5" />} />
         <TaskContent className="py-0">
+          <label className="flex items-center gap-3 py-3 text-sm">
+            <input type="checkbox" checked={String(editValues.serverWalletEnabled) === 'true'} onChange={e => setEditValues({ ...editValues, serverWalletEnabled: String(e.target.checked) })} />
+            Enable email-free registration
+          </label>
+          <p className="pb-3 text-xs text-muted-foreground" role="status">
+            {quota.data ? `Email-free registrations today (${quota.data.date} UTC): ${quota.data.used} used / ${quota.data.limit} limit / ${quota.data.remaining} remaining. Saving limits does not reset usage.` : quota.isError ? 'Registration usage unavailable.' : 'Loading registration usage...'}
+          </p>
           <p className="py-3 text-xs text-muted-foreground">Free requests must satisfy the platform daily limit, the Agent per-user allowance and the Agent daily total. Lifetime free limits are disabled; historical usage is retained.</p>
           {Object.entries(CONFIG_LABELS).map(([key, meta]) => (
             <div key={key} className="flex items-center gap-4 py-3 border-b border-border/20 last:border-0">

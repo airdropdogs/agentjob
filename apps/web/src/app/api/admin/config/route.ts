@@ -40,6 +40,8 @@ export async function PATCH(req: NextRequest) {
     if (!validKeys.includes(key)) {
       return err(`Unknown config key: ${key}`, 400)
     }
+    if (key === CONFIG_KEYS.SERVER_WALLET_ENABLED && !['true', 'false'].includes(value)) return err('Email-free registration must be true or false', 400)
+    if ((key === CONFIG_KEYS.SERVER_WALLET_DAILY_LIMIT || key === CONFIG_KEYS.SERVER_WALLET_IP_DAILY_LIMIT) && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) > 10000)) return err('Registration limits must be whole numbers from 0 to 10000', 400)
     if (key === CONFIG_KEYS.PLATFORM_FEE_RATE && (!value.trim() || !Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) >= 1)) return err('Platform fee rate must be at least 0 and less than 1', 400)
     if (!validAttachmentSetting(key, value)) return err('Invalid attachment limit: ' + key, 400)
     if (!validFreeChatLimit(key, value)) return err('Invalid free quota: ' + key, 400)

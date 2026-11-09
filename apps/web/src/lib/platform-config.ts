@@ -23,6 +23,7 @@ interface PlatformConfigValues {
   freeUserLifetimeLimit: number
   /** Daily automatic Server Wallet registration limit */
   serverWalletDailyLimit: number
+  serverWalletIpDailyLimit: number
   /** Enable or disable Server Wallet registration */
   serverWalletEnabled: boolean
 }
@@ -43,6 +44,7 @@ const DEFAULTS: PlatformConfigValues = {
   freeUserDailyLimit: 2,
   freeUserLifetimeLimit: 20,
   serverWalletDailyLimit: 100,
+  serverWalletIpDailyLimit: 2,
   serverWalletEnabled: true,
 }
 
@@ -79,6 +81,7 @@ export async function getPlatformConfig(): Promise<PlatformConfigValues> {
     freeUserDailyLimit: parseInt(map[CONFIG_KEYS.FREE_USER_DAILY_LIMIT] ?? String(DEFAULTS.freeUserDailyLimit)),
     freeUserLifetimeLimit: parseInt(map[CONFIG_KEYS.FREE_USER_LIFETIME_LIMIT] ?? String(DEFAULTS.freeUserLifetimeLimit)),
     serverWalletDailyLimit: parseInt(map[CONFIG_KEYS.SERVER_WALLET_DAILY_LIMIT] ?? String(DEFAULTS.serverWalletDailyLimit)),
+    serverWalletIpDailyLimit: parseInt(map[CONFIG_KEYS.SERVER_WALLET_IP_DAILY_LIMIT] ?? String(DEFAULTS.serverWalletIpDailyLimit)),
     serverWalletEnabled: (map[CONFIG_KEYS.SERVER_WALLET_ENABLED] ?? 'true') === 'true',
   }
   _cacheAt = Date.now()

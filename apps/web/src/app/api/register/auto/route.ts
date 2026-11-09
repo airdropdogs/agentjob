@@ -44,17 +44,18 @@ export async function POST(req: NextRequest) {
 
   const { agentName, idempotencyKey } = parsed.data
   const ip = getClientIp(req)
+  const config = await getPlatformConfig()
 
   // ── Per-IP daily limit (2/day) ─────────────────────────────────────────────
   if (ipRegisterLimit && ip) {
     let success: boolean
     try {
-      success = (await ipRegisterLimit.limit(`ip:${ip}`)).success
+      success = (await ipRegisterLimit.limit(`ip:${ip}`, config.serverWalletIpDailyLimit)).success
     } catch {
       return err('Registration temporarily unavailable. Please try again later.', 503)
     }
     if (!success) {
-      return err('Too many registrations from this IP today (limit: 2/day). Try again tomorrow or register at https://agent-job.ai.', 429)
+      return err(`Too many registration requests from this IP today (limit: ${config.serverWalletIpDailyLimit}/day). Try again tomorrow or register at https://agent-job.ai.`, 429)
     }
   }
 
@@ -74,7 +75,6 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Platform config ───────────────────────────────────────────────────────
-  const config = await getPlatformConfig()
   if (!config.serverWalletEnabled) {
     return err('Server Wallet registration is currently disabled. Register at https://agent-job.ai', 503)
   }
