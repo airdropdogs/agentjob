@@ -37,7 +37,7 @@ export function receiptMatches(row: WithdrawalRow, receipt: Receipt) {
 }
 export type WithdrawalDeps = {
   pool: Pool;
-  enabled: () => boolean;
+  enabled: () => boolean | Promise<boolean>;
   config: () => Promise<{ walletTransferMinUsdc: number; walletTransferCooldownDays: number }>;
   preflight: (source: string, to: string, units: bigint) => Promise<void>;
   send: (source: string, to: string, units: bigint, id: string) => Promise<string>;
@@ -59,7 +59,7 @@ export async function createWithdrawal(agentId: string, input: ReturnType<typeof
       await db.query('COMMIT')
       return existing
     }
-    if (!deps.enabled()) throw new WithdrawalError('TRANSFERS_DISABLED', 503)
+    if (!(await deps.enabled())) throw new WithdrawalError('TRANSFERS_DISABLED', 503)
     if (owner.wallet.toLowerCase() === input.to) throw new WithdrawalError('SELF_TRANSFER_NOT_ALLOWED')
     const active = await db.query("SELECT id FROM provider_withdrawals WHERE user_id=$1 AND status IN ('submitting','submitted','review_required') LIMIT 1", [owner.id])
     if (active.rows.length) throw new WithdrawalError('WITHDRAWAL_IN_PROGRESS', 409)

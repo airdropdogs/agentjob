@@ -32,7 +32,7 @@ test('durable withdrawal state machine with PostgreSQL constraints and mocked CD
   let sends = 0, fail = false, preflightFails = false, enabled = true
   let minimum = 0.01, receipt: Receipt | null = null
   const deps: WithdrawalDeps = {
-    pool: { ...client, connect: async () => client } as unknown as WithdrawalDeps['pool'], enabled: () => enabled,
+    pool: { ...client, connect: async () => client } as unknown as WithdrawalDeps['pool'], enabled: async () => enabled,
     config: async () => ({ walletTransferMinUsdc: minimum, walletTransferCooldownDays: 7 }),
     preflight: async () => { if (preflightFails) throw new Error('RPC unavailable') },
     send: async (from, to, units, id) => { sends++; assert.equal(from, source); assert.equal(to, recipient); assert.equal(units, BigInt(10000)); assert.match(id, /^[a-f0-9-]{36}$/); if (fail) throw new Error('network timeout'); return hash },

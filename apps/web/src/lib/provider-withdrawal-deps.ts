@@ -18,7 +18,7 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T> {
 }
 export function withdrawalDependencies(): WithdrawalDeps {
   return {
-    pool: getPool(), enabled: () => process.env.ENABLE_REAL_PAYMENTS === 'true', config: getPlatformConfig,
+    pool: getPool(), enabled: async () => (await getPlatformConfig()).serverWalletWithdrawalsEnabled, config: getPlatformConfig,
     async preflight(source, to, units) {
       const [balance, eth] = await Promise.all([
         rpc<string>('eth_call', [{ to: USDC, data: `0x70a08231${source.slice(2).padStart(64, '0')}` }, 'latest']),

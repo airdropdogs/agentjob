@@ -34,6 +34,7 @@ export const CONFIG_KEYS = {
   FREE_USER_LIFETIME_LIMIT: 'free_user_lifetime_limit', // Maximum lifetime free messages per user
   // Automatic Server Wallet registration without email
   SERVER_WALLET_DAILY_LIMIT: 'server_wallet_daily_limit', // Daily Server Wallet registration limit
+  SERVER_WALLET_WITHDRAWALS_ENABLED: 'server_wallet_withdrawals_enabled',
   SERVER_WALLET_ENABLED: 'server_wallet_enabled',         // Registration enabled flag
   SERVER_WALLET_IP_DAILY_LIMIT: 'server_wallet_ip_daily_limit',
 } as const

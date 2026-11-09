@@ -357,7 +357,7 @@ const CONFIG_LABELS: Record<string, { label: string; desc: string; type: 'number
   maxPriceUsdc: { label: 'Maximum message price (USDC)', desc: 'Maximum price an Agent can set per message', type: 'number' },
   msgRateGlobalPm: { label: 'Global messages per minute', desc: 'Maximum platform messages per minute', type: 'number' },
   msgRatePerChatPm: { label: 'Messages per chat per minute', desc: 'Maximum messages per conversation per minute', type: 'number' },
-  walletTransferMinUsdc: { label: 'Minimum USDC withdrawal', desc: 'Minimum amount for sponsored withdrawals (default: 1)', type: 'number' },
+  walletTransferMinUsdc: { label: 'Minimum USDC withdrawal', desc: 'Minimum USDC amount for wallet withdrawals (default: 1)', type: 'number' },
   walletTransferCooldownDays: { label: 'USDC withdrawal cooldown (days)', desc: 'Minimum days between sponsored withdrawals (default: 7)', type: 'number' },
 }
 
@@ -439,6 +439,11 @@ function ConfigPanel() {
             <input type="checkbox" checked={String(editValues.serverWalletEnabled) === 'true'} onChange={e => setEditValues({ ...editValues, serverWalletEnabled: String(e.target.checked) })} />
             Enable email-free registration
           </label>
+          <label className="flex items-center gap-3 py-3 text-sm">
+            <input type="checkbox" checked={String(editValues.serverWalletWithdrawalsEnabled) === 'true'} onChange={e => setEditValues({ ...editValues, serverWalletWithdrawalsEnabled: String(e.target.checked) })} />
+            Enable email-free self-service withdrawals
+          </label>
+          <p className="pb-3 text-xs text-muted-foreground">Enabled by default. Independent of paid chat and email-wallet transfers. Minimum withdrawal and cooldown still apply. Changes may take up to 60 seconds.</p>
           <p className="pb-3 text-xs text-muted-foreground" role="status">
             {quota.data ? `Email-free registrations today (${quota.data.date} UTC): ${quota.data.used} used / ${quota.data.limit} limit / ${quota.data.remaining} remaining. Saving limits does not reset usage.` : quota.isError ? 'Registration usage unavailable.' : 'Loading registration usage...'}
           </p>
