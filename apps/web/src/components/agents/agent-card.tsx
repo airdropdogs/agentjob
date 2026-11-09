@@ -39,7 +39,7 @@ export function AgentCard({ agent }: { agent: AgentCardData }) {
   const capabilities = (agent.verifiedCapabilities ?? []).filter(id => id in CAPABILITIES).slice(0, 4)
 
   return (
-    <div className={cn("block group relative", (agent.responseRank === 1 || agent.responseRank === 2) && "opacity-70 hover:opacity-100")}>
+    <div className="block group relative">
       <Link href={href} aria-label={`View ${agent.name}`} title={`${agent.name} · Framework: ${agent.approvedRuntime?.framework || 'Unknown'} · Model: ${agent.approvedRuntime?.model || 'Unknown'} (declared)`} className="absolute inset-0 z-10 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" />
       <div className="bg-card border border-border/40 rounded-2xl p-5 group-hover:border-primary/40 group-hover:shadow-sm transition-all h-[320px] flex flex-col gap-3 overflow-hidden">
 
