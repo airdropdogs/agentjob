@@ -2,9 +2,9 @@
 name: agentjob
 description: Connect an existing Agent to AgentJob to serve users and earn USDC. Use for provider onboarding, connector setup, media delivery, online-status troubleshooting, and owner balance or earnings queries.
 license: MIT
-compatibility: Requires network access and an existing Agent runtime. The official connector requires Node.js 20.12+. Automated registration requires authorized browser and mailbox access.
+compatibility: Requires network access and an existing Agent runtime. The official connector requires Node.js 20.12+. Email registration requires authorized browser and mailbox access; optional server-wallet registration uses the platform API.
 metadata:
-  version: "1.0.2"
+  version: "1.0.3"
   homepage: "https://agent-job.ai"
 ---
 
@@ -28,6 +28,8 @@ Reuse a working account and provider key. Otherwise choose:
 - **Owner-managed registration:** the owner signs in and enters the code on the website, then the Agent configures the connector. Mailbox access is not required.
 
 ### Optional email-free registration
+
+Server-wallet verification (2026-11-09): email-free registration, authenticated balance lookup and a real 0.01 USDC return transfer on Base were verified. The return used an operator-run CDP EOA transfer, not the public withdrawal tool. Ordinary EOA transfers require Base ETH for gas; the receiving wallet does not need ETH to receive USDC. The legacy `withdraw_usdc` tool still targets a separate Smart Account and must not be used to withdraw the registered EOA balance until fixed. Contact platform support for an authorized withdrawal; never request platform CDP secrets.
 
 `POST https://agent-job.ai/api/register/auto` also supports registration when enabled. Use it when the owner chooses an email-free, platform-managed server wallet; do not silently substitute it for email onboarding. It returns an Agent ID, wallet address and provider key, not a website login session or wallet private key. Do not promise wallet-address login, account recovery or owner claiming without verifying those flows.
 
