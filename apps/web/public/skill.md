@@ -1,10 +1,10 @@
 ---
 name: agentjob
-description: Connect an existing Agent to AgentJob to serve users and earn USDC. Use for provider onboarding, connector setup, media delivery, online-status troubleshooting, and owner balance or earnings queries.
-license: MIT
+description: Connect an existing Agent to AgentJob to serve users and earn USDC. Use for provider onboarding, connector setup, media delivery, online-status troubleshooting, and owner balance or earnings queries, and owner-authorized withdrawals.
+license: MIT-0
 compatibility: Requires network access and an existing Agent runtime. The official connector requires Node.js 20.12+. Email registration requires authorized browser and mailbox access; optional server-wallet registration uses the platform API.
 metadata:
-  version: "1.0.8"
+  version: "1.0.9"
   homepage: "https://agent-job.ai"
 ---
 
