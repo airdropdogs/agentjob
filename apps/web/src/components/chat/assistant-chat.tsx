@@ -178,8 +178,8 @@ export function ChatMessages({ status, waiting, progress }: { status: string; wa
   )
 }
 
-export function ChatComposer({ placeholder, disabled, status, onStop, costLabel, costDescription }: {
-  placeholder: string; disabled: boolean; status: string; onStop: () => void; costLabel?: string; costDescription?: string
+export function ChatComposer({ placeholder, disabled, status, onStop, costLabel, costDescription, onCostRefresh }: {
+  placeholder: string; disabled: boolean; status: string; onStop: () => void; costLabel?: string; costDescription?: string; onCostRefresh?: () => void
 }) {
   const runtime = useAui()
   const enabled = useAuiState(s => s.thread.capabilities.attachments)
@@ -197,7 +197,9 @@ export function ChatComposer({ placeholder, disabled, status, onStop, costLabel,
       <ComposerPrimitive.Input aria-label="Message" placeholder={placeholder} disabled={disabled}
         className="min-h-9 max-h-52 min-w-0 flex-1 resize-none bg-transparent py-1.5 pl-3 pr-1 text-base leading-6 outline-none placeholder:text-[#8e8e8e]" rows={1} />
       <div className="flex shrink-0 items-center gap-2">
-        {costLabel && <span aria-live="polite" title={costDescription} className="whitespace-nowrap text-xs font-medium tabular-nums text-neutral-500 dark:text-neutral-400">{costLabel}</span>}
+        {costLabel && (onCostRefresh
+          ? <button type="button" onClick={onCostRefresh} title={costDescription} className="whitespace-nowrap text-xs font-medium text-primary underline">{costLabel}</button>
+          : <span aria-live="polite" title={costDescription} className="whitespace-nowrap text-xs font-medium tabular-nums text-neutral-500 dark:text-neutral-400">{costLabel}</span>)}
         {status === 'waiting' || status === 'sending' ? (
           <button type="button" aria-label="Cancel generation" title="Cancel generation. Payments already made are not automatically refunded." disabled={status === 'sending'} onClick={onStop}
             className="flex size-9 items-center justify-center rounded-full bg-[#0d0d0d] text-white disabled:opacity-30 dark:bg-white dark:text-black"><Square className="size-3 fill-current" /></button>

@@ -26,6 +26,7 @@ import { ChatRuntime, ChatMessages, ChatComposer } from '@/components/chat/assis
 import { usdcMicro } from '@/lib/chat-payment-policy'
 import { getAccessToken, getCurrentUser } from '@coinbase/cdp-core'
 import { ensurePaymentWallet } from '@/lib/payment-wallet-session'
+import { loadChatEligibility } from '@/lib/load-chat-eligibility'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -340,26 +341,24 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
   })
 
   // ── load history on mount ──────────────────────────────────
-  const { data: eligibility, refetch: refetchEligibility, isPending: eligibilityLoading } = useQuery<ChatEligibility | null>({
+  const { data: eligibility, refetch: refetchEligibility, isPending: eligibilityLoading, isFetching: eligibilityFetching, error: eligibilityError } = useQuery<ChatEligibility>({
     queryKey: ['chat-eligibility', agent?.id, chatId, session?.userId],
-    enabled: !!agent?.id,
-    queryFn: async () => {
-      const response = await fetch('/api/chat/eligibility?' + new URLSearchParams({ agent_id: agent!.id, chat_id: chatId }), { cache: 'no-store' })
-      if (!response.ok) return null
-      return response.json()
-    },
+    enabled: !!agent?.id && !!session?.userId,
+    queryFn: () => loadChatEligibility(new URLSearchParams({ agent_id: agent!.id, chat_id: chatId })),
+    retry: 1,
     refetchInterval: 15_000,
   })
   const freeEligible = eligibility?.eligible === true
   const freeMessagesRemaining = eligibility?.freeMessagesRemaining
   const freeMessageLabel = `This message is free${typeof freeMessagesRemaining === 'number' ? ` / up to ${freeMessagesRemaining} remaining today with this Agent` : ''}`
   const freeAlreadyUsed = ['agent_free_used', 'user_daily_limit', 'agent_daily_limit'].includes(eligibility?.reason ?? '')
-  const unknownEligibilityMessage = eligibilityLoading ? 'Checking free eligibility...' : session ? 'Could not check free eligibility. Try again.' : 'Sign in to check free eligibility.'
+  const unknownEligibilityMessage = !session?.userId ? 'Sign in to check free eligibility.' : eligibilityLoading || eligibilityFetching ? 'Checking free eligibility...' : `Could not check the price. Click Check price to retry. ${eligibilityError?.message ?? ''}`
   const eligibilityKnown = typeof eligibility?.eligible === 'boolean'
+  const unknownCostLabel = !session?.userId ? 'Sign in' : eligibilityLoading || eligibilityFetching ? 'Checking' : 'Check price'
   const priceLabel = eligibility?.priceMicro ? formatUsdc(Number(eligibility.priceMicro) / 1_000_000) : formatUsdc(agent?.priceSubsequent ?? '0')
   const messageCostLabel = freeEligible
     ? `Free${typeof freeMessagesRemaining === 'number' ? ` / up to ${freeMessagesRemaining}` : ''}`
-    : eligibilityKnown ? `${priceLabel} USDC` : 'Checking price…'
+    : eligibilityKnown ? `${priceLabel} USDC` : unknownCostLabel
   useEffect(() => {
     if (grantRef.current && grantRef.current.scope.agentId !== agent?.id) revokePaymentGrant()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -604,7 +603,7 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
   // Send message
   async function handleSubmit(message: { text: string; attachments?: import('@/lib/attachment-policy').ChatAttachment[] }) {
     const text = message.text.trim()
-    if ((!text && !message.attachments?.length) || !agent?.online || chatStatus !== 'idle' || sendingRef.current) return
+    if ((!text && !message.attachments?.length) || !eligibilityKnown || !agent?.online || chatStatus !== 'idle' || sendingRef.current) return
     if (pendingMessageRef.current) {
       setErrorMsg('Retry the saved message first. Its payment request must not be replaced.')
       setChatStatus('error')
@@ -1093,7 +1092,7 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
 
         <div className={cn('px-4 sm:px-6', messages.length === 0 ? 'flex flex-1 flex-col justify-center pb-[16vh]' : 'shrink-0 pb-2 pt-2')}>
           {messages.length === 0 && <h1 className="mb-6 text-center text-2xl font-normal leading-7">Where should we begin?</h1>}
-          <ChatComposer costLabel={freeEligible ? 'Free' : eligibilityKnown ? `${priceLabel} U` : '…'} costDescription={freeEligible ? freeMessageLabel : eligibilityKnown ? `${priceLabel} USDC for this message on Base` : unknownEligibilityMessage} placeholder={!agent?.online ? 'Agent is currently offline' : pendingMessageRef.current && !isBusy ? 'Resolve the saved request to continue' : 'Ask anything'} disabled={isBusy || !agent?.online || chatStatus === 'error' || !!pendingMessageRef.current} status={chatStatus} onStop={stopPolling} />
+          <ChatComposer costLabel={freeEligible ? 'Free' : eligibilityKnown ? `${priceLabel} U` : unknownCostLabel} onCostRefresh={!eligibilityKnown && !eligibilityFetching && !!session?.userId ? () => { void refetchEligibility() } : undefined} costDescription={freeEligible ? freeMessageLabel : eligibilityKnown ? `${priceLabel} USDC for this message on Base` : unknownEligibilityMessage} placeholder={!agent?.online ? 'Agent is currently offline' : pendingMessageRef.current && !isBusy ? 'Resolve the saved request to continue' : 'Ask anything'} disabled={isBusy || !eligibilityKnown || !agent?.online || chatStatus === 'error' || !!pendingMessageRef.current} status={chatStatus} onStop={stopPolling} />
           {messages.length > 0 && <p className="mt-2 text-center text-xs text-[#5d5d5d] dark:text-[#afafaf]">Agents can make mistakes. Check important info.</p>}
         </div>
 
