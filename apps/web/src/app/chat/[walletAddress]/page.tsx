@@ -2,7 +2,7 @@
 
 import { use, useEffect, useRef, useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useX402, useCurrentUser, useIsSignedIn } from '@coinbase/cdp-hooks'
+import { useX402, useCurrentUser, useIsSignedIn, useIsInitialized } from '@coinbase/cdp-hooks'
 import {
   AlertCircle, CheckCircle2, Wallet, ArrowRight, Loader2,
   Plus, PanelLeftClose, PanelLeftOpen, Trash2, FileQuestion,
@@ -24,6 +24,8 @@ import { ThreadPrimitive } from '@assistant-ui/react'
 import { Popover } from '@base-ui/react/popover'
 import { ChatRuntime, ChatMessages, ChatComposer } from '@/components/chat/assistant-chat'
 import { usdcMicro } from '@/lib/chat-payment-policy'
+import { getAccessToken, getCurrentUser } from '@coinbase/cdp-core'
+import { ensurePaymentWallet } from '@/lib/payment-wallet-session'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -291,6 +293,9 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
   }, [session?.userId, pendingStorageKey, savedStorageKey])
 
   // ── CDP hooks ──────────────────────────────────────────────
+  const { isInitialized } = useIsInitialized()
+  const initializedRef = useRef(isInitialized)
+  initializedRef.current = isInitialized
   const { isSignedIn } = useIsSignedIn()
   const { currentUser } = useCurrentUser()
   const payer = currentUser?.evmSmartAccountObjects?.[0]?.address ?? currentUser?.evmAccountObjects?.[0]?.address ?? ''
@@ -299,7 +304,7 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
     if (grantRef.current && grantRef.current.scope.payer !== payer.toLowerCase()) revokePaymentGrant()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payer])
-  const { fetchWithPayment } = useX402({ maxValue: CHAT_PAYMENT_MAX_MICRO, fetch: guardedPaymentFetch, address: payer || undefined })
+  const { fetchWithPayment } = useX402({ maxValue: CHAT_PAYMENT_MAX_MICRO, fetch: guardedPaymentFetch, address: session?.wallet || payer || undefined })
 
   useEffect(() => {
     setWalletReady(!!isSignedIn && !!currentUser)
@@ -572,14 +577,8 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
       try { raw402 = await res.clone().text() } catch { /* consumed */ }
       console.error(`[x402/chat] 402 [${phase}]:`, raw402 || '(empty)')
       setChatStatus('error')
-      if (!walletReady) {
-        console.warn('[x402/chat] walletReady=false → CDP session expired, need re-login')
-        setErrorMsg('payment_required')
-      } else {
-        const hint = raw402 ? raw402.slice(0, 300) : `Payment signing failed (insufficient balance?)`
-        setRawX402Error(`[${phase}] ${hint}`)
-        setErrorMsg('Payment could not be completed. Check your wallet or try again; a payment challenge does not necessarily mean insufficient balance.')
-      }
+      setRawX402Error(`[${phase}] ${raw402 ? raw402.slice(0, 300) : 'Payment authorization was not accepted'}`)
+      setErrorMsg('Payment could not be completed. Retry the saved message; a payment challenge does not necessarily mean insufficient balance.')
       return true
     }
     if (!res.ok && res.status !== 202 && res.status !== 200) {
@@ -652,7 +651,9 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
         request: phase => fetch('/api/chat', requestOptions(phase)),
         confirm: async (phase, quote) => {
           persistPending(pending)
-          if (!walletReady || !agent) throw new Error('Payment required: sign in to your wallet first')
+          if (!agent) throw new Error('Agent is unavailable')
+          payerRef.current = await ensurePaymentWallet({ expectedAddress: session?.wallet ?? '', initialized: () => initializedRef.current, getUser: getCurrentUser, getToken: getAccessToken })
+          setWalletReady(true)
           const response = await fetch('/api/chat/eligibility?' + new URLSearchParams({ agent_id: agent.id, chat_id: pending.chatId, idempotency_key: pending.key }), { cache: 'no-store' })
           if (!response.ok) throw new Error('Could not verify current payment eligibility')
           const current: ChatEligibility = await response.json()
@@ -717,14 +718,14 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
       setRawX402Error(msg)
       if (msg.includes('402') || msgLower.includes('payment required')) {
         setChatStatus('error')
-        setErrorMsg('payment_required')
+        setErrorMsg('Payment could not be completed. Retry the saved message; a payment challenge does not mean insufficient balance.')
       } else if (msgLower.includes('insufficient usdc balance')) {
         // Only the verified USDC balance check should open funding automatically.
         setChatStatus('error')
         setErrorMsg('usdc_insufficient')
       } else if (msgLower.includes('no account found') || msgLower.includes('user not authenticated')) {
         setChatStatus('error')
-        setErrorMsg('payment_required')
+        setErrorMsg('WALLET_CONNECTION_REQUIRED')
       } else {
         setChatStatus('error')
         setErrorMsg(msg || 'Something went wrong. Try again.')
@@ -935,7 +936,7 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
               </div>
             )}
             <div className="flex shrink-0 items-center gap-4 text-xs">
-              <button type="button" className="text-primary underline" title="Add Base USDC to your wallet." onClick={() => setDepositOpen(true)}>Please add USDC</button>
+              {errorMsg === 'usdc_insufficient' && <button type="button" className="text-primary underline" title="Add Base USDC to your wallet." onClick={() => setDepositOpen(true)}>Please add USDC</button>}
               {chatStatus === 'error' && pendingMessageRef.current && (
                 <button type="button" className="text-primary underline" title="Retry this message using the same payment request" onClick={() => {
                   if (pendingMessageRef.current) void sendPendingMessage(pendingMessageRef.current)
@@ -1056,16 +1057,20 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
           if (!open && errorMsg === 'usdc_insufficient') { setErrorMsg('Balance was insufficient. After funding, retry the saved message.'); setRawX402Error('') }
         }} />
 
-        {errorMsg === 'payment_required' && !walletReady && (
+        {errorMsg.startsWith('WALLET_') && (
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 p-4">
             <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full">
               <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center mb-4">
                 <Wallet className="w-6 h-6 text-amber-500" />
               </div>
-              <h2 className="text-lg font-semibold mb-2">Wallet session expired</h2>
+              <h2 className="text-lg font-semibold mb-2">Reconnect payment wallet</h2>
               <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                Your payment wallet session has expired. Please log in again in a new tab, then refresh this page to continue.
+                You are signed in to AgentJob, but the payment wallet connection is not ready. This is separate from your USDC balance. Retry the saved message to reconnect. If it still fails, sign in again and return here.
               </p>
+              <p className="mb-3 text-xs text-muted-foreground">{errorMsg}</p>
+              <button type="button" className="mb-3 w-full rounded-xl bg-primary px-3 py-2.5 text-sm text-white" onClick={() => {
+                if (pendingMessageRef.current) void sendPendingMessage(pendingMessageRef.current)
+              }}>Reconnect &amp; retry saved message</button>
               <div className="flex gap-2">
                 <button
                   onClick={() => setErrorMsg('')}
@@ -1075,7 +1080,7 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.open('/login', '_blank')}
+                  onClick={() => window.open('/login?from=' + encodeURIComponent(window.location.pathname), '_blank', 'noopener,noreferrer')}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-medium transition-colors"
                 >
                   Log in (new tab)

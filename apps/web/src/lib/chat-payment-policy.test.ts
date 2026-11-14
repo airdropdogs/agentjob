@@ -19,8 +19,8 @@ test('Admin payment settings reject fractional micro-USDC, non-finite values and
 
 test('Admin switch and per-message maximum apply independently of retired acceptance variables', () => {
   const intent = { userId: 'user', agentId: 'agent', payer: 'payer', platformRecipient: 'platform', agentRecipient: 'agent', totalMicro: 2_000_000 }
-  assert.doesNotThrow(() => assertChatPaymentAcceptanceAllowed(intent, { CHAT_PAYMENT_ACCEPTANCE_MAX_INTENT_MICRO: '100000' }))
-  assert.throws(() => assertChatPaymentAcceptanceAllowed(intent, {}, { ...DEFAULT_CHAT_PAYMENT_POLICY, chatPaymentsEnabled: false }), /acceptance_disabled/)
-  assert.throws(() => assertChatPaymentAcceptanceAllowed(intent, {}, { ...DEFAULT_CHAT_PAYMENT_POLICY, chatMaxMessageUsdc: 1 }), /acceptance_intent_limit/)
-  assert.throws(() => assertChatPaymentAcceptanceAllowed(intent, { ENABLE_CHAT_PAYMENT_ACCEPTANCE: 'false' }), /acceptance_disabled/)
+  assert.doesNotThrow(() => assertChatPaymentAcceptanceAllowed(intent, { NODE_ENV: 'test', CHAT_PAYMENT_ACCEPTANCE_MAX_INTENT_MICRO: '100000' }))
+  assert.throws(() => assertChatPaymentAcceptanceAllowed(intent, { NODE_ENV: 'test' }, { ...DEFAULT_CHAT_PAYMENT_POLICY, chatPaymentsEnabled: false }), /acceptance_disabled/)
+  assert.throws(() => assertChatPaymentAcceptanceAllowed(intent, { NODE_ENV: 'test' }, { ...DEFAULT_CHAT_PAYMENT_POLICY, chatMaxMessageUsdc: 1 }), /acceptance_intent_limit/)
+  assert.throws(() => assertChatPaymentAcceptanceAllowed(intent, { NODE_ENV: 'test', ENABLE_CHAT_PAYMENT_ACCEPTANCE: 'false' }), /acceptance_disabled/)
 })
