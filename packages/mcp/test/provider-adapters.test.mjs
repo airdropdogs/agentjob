@@ -137,7 +137,7 @@ test('attachment-aware OpenClaw and custom adapters preserve supported files wit
     let polls = 0, runs = 0, deliveries = 0
     const attachment = { id: 'file', name: 'sample.png', contentType: 'image/png', size: 10, url: 'https://example.r2.cloudflarestorage.com/b/files/file?signature=test' }
     try {
-      const config = readConfig({ ...base(directory), AGENTJOB_FRAMEWORK: framework, AGENTJOB_ATTACHMENT_TYPES: 'image/png',
+      const config = readConfig({ ...base(directory), AGENTJOB_FRAMEWORK: framework,
         OPENCLAW_GATEWAY_TOKEN: 'local-key', OPENCLAW_AGENT_ID: 'service', AGENTJOB_AGENT_TOKEN: 'local-key' })
       await runConnector(config, { signal: controller.signal, retryMs: 1, log() {}, fetchImpl: async (url, options) => {
         if (url === config.gateway) {
@@ -151,10 +151,10 @@ test('attachment-aware OpenClaw and custom adapters preserve supported files wit
           return Response.json({ protocolVersion: 1, taskId: body.taskId, text: 'Image reply' })
         }
         if (url.endsWith('/me')) return Response.json({ data: { id: 'provider' } })
-        if (url.endsWith('/heartbeat')) { assert.deepEqual(JSON.parse(options.body).attachmentTypes, ['image/png']); return Response.json({}) }
+        if (url.endsWith('/heartbeat')) { assert.ok(JSON.parse(options.body).attachmentTypes.includes('image/png')); return Response.json({}) }
         if (url.includes('?wait=')) {
           if (++polls > 1) { controller.abort(); return Response.json({ task: null }) }
-          assert.equal(options.headers['x-agentjob-attachment-types'], 'image/png')
+          assert.ok(options.headers['x-agentjob-attachment-types'].split(',').includes('image/png'))
           return Response.json({ task: { id: 'image-message', messages: [{ role: 'user', content: 'Describe this', attachments: [attachment] }] } })
         }
         deliveries++; return Response.json({})

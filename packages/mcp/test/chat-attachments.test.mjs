@@ -51,7 +51,7 @@ test('ownership binds files to customer, Agent and conversation; no URL is issue
   }
 })
 test('unsupported, expired, forged metadata and over-limit files reject before delivery', async () => {
-  await assert.rejects(service({ supported: [] }).validateChatAttachments([message], 'u', 'a', 'c'), /does not currently support/)
+  await assert.rejects(service({ supported: [] }).validateChatAttachments([message], 'u', 'a', 'c'), /No new payment/)
   await assert.rejects(service({ expired: true }).validateChatAttachments([message], 'u', 'a', 'c'), /expired/)
   await assert.rejects(service().validateChatAttachments([{ ...message, attachments: [{ ...file, name: 'forged.png' }] }], 'u', 'a', 'c'), /unavailable/)
   await assert.rejects(service().validateChatAttachments([{ ...message, attachments: Array(5).fill(file) }], 'u', 'a', 'c'), /Invalid/)
@@ -67,6 +67,12 @@ test('ready files get fresh URLs, and injected client URL is never forwarded', a
   const result = await s.providerAttachments([{ ...message, attachments: [{ ...file, url: 'http://localhost/secret' }] }], 'u', 'a', 'c')
   assert.equal(result[0].attachments[0].url, 'https://private.example/file')
   assert.equal(s.signed(), 1)
+})
+
+test('an older polling worker cannot silently omit the current attachment', async () => {
+  const s = service()
+  await assert.rejects(s.providerAttachments([message], 'u', 'a', 'c', []), /cannot be omitted/)
+  assert.equal(s.signed(), 0)
 })
 
 test('R2 finalize rejects size/type/header mismatch and uses conditional immutable copy', async () => {
@@ -122,12 +128,22 @@ function uploadRoute({ signedIn = true, quota = 0, allowed = true, owner = true,
 }
 const uploadRequest = () => ({ json: async () => ({ chatId: id, agentWallet: '0x' + '1'.repeat(40), name: 'photo.png', size: 32 }) })
 test('upload HTTP endpoints reject unsigned-in, unsupported and exhausted users without signing R2 access', async () => {
-  for (const [options, status] of [[{ signedIn: false }, 401], [{ allowed: false }, 400], [{ quota: 50 * 1048576 }, 429]]) {
+  for (const [options, status] of [[{ signedIn: false }, 401], [{ quota: 50 * 1048576 }, 429]]) {
     const route = uploadRoute(options)
     assert.equal((await route.POST(uploadRequest())).status, status)
     assert.equal(route.signed(), 0)
     assert.equal(route.calls.some(c => c.sql.includes('INSERT INTO')), false)
   }
+})
+
+test('platform uploads stay available without connector declarations or verification badges', async () => {
+  const route = uploadRoute({ allowed: false })
+  const response = await route.GET({ nextUrl: new URL('https://agent-job.ai/api/chat/attachments?agentWallet=0x' + '1'.repeat(40)) })
+  const body = await response.json()
+  assert.equal(body.enabled, true)
+  assert.ok(body.acceptedTypes.includes('image/png'))
+  assert.ok(body.acceptedTypes.includes('application/pdf'))
+  assert.equal((await route.POST(uploadRequest())).status, 200)
 })
 test('upload quota reservation commits once; download is private and repeat finalize does not overwrite', async () => {
   const route = uploadRoute()

@@ -18,9 +18,13 @@ export function useChatAttachmentAdapter(chatId: string, agentWallet: string) {
   const pendingCount = useRef(0)
   useEffect(() => {
     const controller = new AbortController()
-    fetch(`/api/chat/attachments?agentWallet=${encodeURIComponent(agentWallet)}`, { signal: controller.signal })
-      .then(json).then(setPolicy).catch(() => {})
-    return () => controller.abort()
+    setPolicy(null)
+    const refresh = () => fetch(`/api/chat/attachments?agentWallet=${encodeURIComponent(agentWallet)}`, { credentials: 'include', signal: controller.signal })
+      .then(json).then(value => { if (!controller.signal.aborted) setPolicy(value) }).catch(() => {})
+    void refresh()
+    const interval = setInterval(refresh, 30000)
+    window.addEventListener('focus', refresh)
+    return () => { controller.abort(); clearInterval(interval); window.removeEventListener('focus', refresh) }
   }, [agentWallet])
   const adapter = useMemo<AttachmentAdapter | undefined>(() => !policy?.enabled ? undefined : ({
     accept: [...policy.acceptedTypes, ...Object.entries(FILE_TYPES).filter(([, type]) => policy.acceptedTypes.includes(type)).map(([ext]) => '.' + ext)].join(','),

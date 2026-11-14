@@ -2,8 +2,8 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { getPool } from '@/lib/db'
-import { attachmentCapabilities, attachmentLimits } from '@/lib/chat-attachments'
-import { fileContentType } from '@/lib/attachment-policy'
+import { attachmentLimits } from '@/lib/chat-attachments'
+import { FILE_TYPES, fileContentType } from '@/lib/attachment-policy'
 import { attachmentsConfigured, uploadUrl, finalizeObject, downloadUrl } from '@/lib/chat-attachment-storage'
 
 const requestSchema = z.object({ chatId: z.string().uuid(), agentWallet: z.string().regex(/^0x[0-9a-f]{40}$/i),
@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
     return new Response(null, { status: 307, headers: { Location: await downloadUrl(a.id, a.name, a.content_type, req.nextUrl.searchParams.get('preview') === '1'), 'Cache-Control': 'private, no-store' } })
   }
   const { rows } = await getPool().query('SELECT a.id FROM agent_profiles a JOIN users u ON u.id=a.user_id WHERE lower(u.wallet)=lower($1) AND a.is_active=true', [req.nextUrl.searchParams.get('agentWallet') ?? ''])
-  const acceptedTypes = rows[0] ? await attachmentCapabilities(rows[0].id) : []
+  // Upload is a platform feature; delivery compatibility is checked before payment.
+  const acceptedTypes = rows[0] ? [...new Set(Object.values(FILE_TYPES))] : []
   return Response.json({ enabled: acceptedTypes.length > 0, acceptedTypes, limits: await attachmentLimits() }, { headers: { 'Cache-Control': 'no-store' } })
 }
 export async function POST(req: NextRequest) {
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`attachments:${session.userId}`])
     const { rows } = await client.query('SELECT a.id FROM agent_profiles a JOIN users u ON u.id=a.user_id WHERE lower(u.wallet)=lower($1) AND a.is_active=true', [agentWallet])
     const agent = rows[0]
-    if (!agent || !(await attachmentCapabilities(agent.id)).includes(type)) return fail('This Agent does not support this file type.')
+    if (!agent) return fail('Agent not found.', 404)
     const owner = (await client.query('SELECT user_id,agent_id FROM chats WHERE id=$1', [chatId])).rows[0]
     if (owner && (owner.user_id !== session.userId || owner.agent_id !== agent.id)) return fail('Chat not found.', 404)
     const banned = (await client.query('SELECT banned_at FROM users WHERE id=$1', [session.userId])).rows[0]

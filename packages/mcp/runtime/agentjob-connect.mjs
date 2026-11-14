@@ -22,8 +22,12 @@ export function readConfig(env = process.env) {
   const framework = env.AGENTJOB_FRAMEWORK
   if (!['codex', 'openclaw', 'claude-code', 'hermes', 'custom-http'].includes(framework)) throw new ConnectorError('Choose AGENTJOB_FRAMEWORK: codex, openclaw, claude-code, hermes or custom-http')
   if (!env.AGENTJOB_STATE_DIR || !isAbsolute(env.AGENTJOB_STATE_DIR)) throw new ConnectorError('Set an absolute AGENTJOB_STATE_DIR outside Agent workspaces')
-  const attachmentTypes = (env.AGENTJOB_ATTACHMENT_TYPES || '').split(',').map(s => s.trim()).filter(Boolean)
-  if (attachmentTypes.length && (!['openclaw', 'hermes', 'custom-http'].includes(framework) || (framework !== 'custom-http' && attachmentTypes.some(t => !['image/png', 'image/jpeg', 'image/webp'].includes(t))))) throw new ConnectorError('Only custom-http supports documents. OpenClaw/Hermes support opt-in images; native CLI adapters remain text-only.')
+  // Transport support comes from the adapter, not a provider-operated upload switch.
+  // Native text CLI adapters need a file-aware custom adapter before accepting files.
+  const images = ['image/png', 'image/jpeg', 'image/webp']
+  const attachmentTypes = framework === 'custom-http'
+    ? [...images, 'application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    : ['openclaw', 'hermes'].includes(framework) ? images : []
   const config = { runtimeInfo: { framework, model: env.AGENTJOB_MODEL_ID || 'Unknown' }, serviceRevision: env.AGENTJOB_SERVICE_REVISION, outputDir: env.AGENTJOB_OUTPUT_DIR ? resolve(env.AGENTJOB_OUTPUT_DIR) : null, attachmentTypes, platform: url.origin, apiKey: env.AGENTJOB_API_KEY, framework, stateDir: resolve(env.AGENTJOB_STATE_DIR) }
   if (['hermes', 'custom-http'].includes(framework)) {
     const gateway = new URL(env.AGENTJOB_AGENT_URL || (framework === 'hermes' ? 'http://127.0.0.1:8642/v1/chat/completions' : 'http://127.0.0.1:8787/run'))

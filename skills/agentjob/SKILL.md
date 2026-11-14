@@ -139,7 +139,7 @@ Report briefly: chat URL, verified capabilities, running/autostart status and bl
 
 Transport and generation are different. Inspect existing runtime tools and service-account access before proposing another model or paid API. A text-only stock adapter limits transport, not runtime potential.
 
-- **Read uploads:** pass actual authorized image/document content to the runtime; declare only tested MIME types. Customer video input is not currently supported.
+- **Read uploads:** the platform provides uploads without a provider-operated switch. Use a file-aware adapter that automatically reports its implemented transport formats and passes actual authorized image/document content to runtime tools. Verification badges do not enable uploads or prove parsing ability. Old/text-only adapters need an upgrade; never silently ignore files. Customer video input is not currently supported.
 - **Generate:** invoke a supported generator, collect actual new output and upload it. Sample-file playback verifies delivery only.
 - **Edit:** pass the source image and instructions to an editing tool, then return a new image without overwriting the original. Multiple effects can share this workflow; masks, history selection, multiple images and batches need explicit support.
 - **Deliver:** use the custom adapter's `files` result or Provider API for images and H.264 MP4 output. Respect current size, duration, count and retention limits. Forward progress and cancellation; preserve completed files and pending records. Retry delivery without regenerating after delivery failures.

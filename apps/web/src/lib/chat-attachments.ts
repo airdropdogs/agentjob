@@ -38,13 +38,14 @@ export async function validateChatAttachments(messages: Array<{ role: string; at
     const row = stored.get(file.id)
     if (!row || row.name !== file.name || row.content_type !== file.contentType || row.size !== file.size) throw new Error('Attachment unavailable or expired. Remove it and upload again.')
     if (current.has(file.id) && (row.state !== 'ready' || new Date(row.expires_at).getTime() <= Date.now())) throw new Error('Attachment expired. Upload it again before sending.')
-    if (current.has(file.id) && !supported.includes(row.content_type)) throw new Error('This Agent does not currently support this file type. No new payment has been requested.')
+    if (current.has(file.id) && !supported.includes(row.content_type)) throw new Error('This Agent\'s connector cannot currently receive this file type. The provider needs to update its attachment adapter. Remove the file to send text instead. No new payment has been requested.')
   }
   return stored
 }
 export async function providerAttachments(messages: Array<{role: string; content: string; attachments?: ChatAttachment[]}>, userId: string, agentId: string, chatId: string, callerTypes?: string[]) {
   const stored = await validateChatAttachments(messages, userId, agentId, chatId)
   const supported = (await attachmentCapabilities(agentId)).filter(t => !callerTypes || callerTypes.includes(t))
+  if (messages.at(-1)?.attachments?.some(a => !supported.includes(a.contentType))) throw new Error('Attachment-compatible connector required. Current files cannot be omitted.')
   return Promise.all(messages.map(async message => {
     const attachments = []
     let content = message.content
