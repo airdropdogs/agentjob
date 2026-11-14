@@ -23,6 +23,7 @@ import { assertPaymentBalance } from '@/lib/wallet-funding'
 import { ThreadPrimitive } from '@assistant-ui/react'
 import { Popover } from '@base-ui/react/popover'
 import { ChatRuntime, ChatMessages, ChatComposer } from '@/components/chat/assistant-chat'
+import { usdcMicro } from '@/lib/chat-payment-policy'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,10 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
   const [hiddenSavedKeys, setHiddenSavedKeys] = useState<string[]>([])
   const sendingRef = useRef(false)
   const approvedPaymentRef = useRef<{ key: string; phase: PaymentPhase; quote: PaymentQuote } | null>(null)
-  const [paymentConfirmation, setPaymentConfirmation] = useState<{ scope: PaymentScope; remainingBudgetMicro: string } | null>(null)
+  const [paymentConfirmation, setPaymentConfirmation] = useState<{ scope: PaymentScope; remainingBudgetMicro: string; minutes: number } | null>(null)
+  const [authorizationBudget, setAuthorizationBudget] = useState('1')
+  const selectedBudgetMicro = usdcMicro(authorizationBudget)
+  const validAuthorizationBudget = !!paymentConfirmation && selectedBudgetMicro !== null && selectedBudgetMicro >= Number(paymentConfirmation.scope.priceMicro) && selectedBudgetMicro <= Number(paymentConfirmation.remainingBudgetMicro)
   const grantRef = useRef<PaymentGrant | null>(null)
   const [paymentGrant, setPaymentGrant] = useState<PaymentGrant | null>(null)
   const payerRef = useRef('')
@@ -165,13 +169,14 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
     approvedPaymentRef.current = null
     decidePayment(false)
   }
-  const paymentDecisionRef = useRef<((confirmed: boolean) => void) | null>(null)
+  const paymentDecisionRef = useRef<((budget: string | null) => void) | null>(null)
   function decidePayment(confirmed: boolean) {
-    paymentDecisionRef.current?.(confirmed)
+    if (confirmed && !validAuthorizationBudget) return
+    paymentDecisionRef.current?.(confirmed ? String(selectedBudgetMicro) : null)
     paymentDecisionRef.current = null
     setPaymentConfirmation(null)
   }
-  useEffect(() => () => paymentDecisionRef.current?.(false), [])
+  useEffect(() => () => paymentDecisionRef.current?.(null), [])
   const guardedPaymentFetch = useCallback<typeof fetch>(async (input, init) => {
     const approved = approvedPaymentRef.current
     const grant = grantRef.current
@@ -581,9 +586,7 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
       const json = await res.json().catch(() => ({}))
       const code: string = json.code ?? ''
       const detail: string = json.error ?? ''
-      if (code === 'acceptance_not_allowed' || detail.includes('acceptance_not_allowed')) {
-        setErrorMsg('Paid chat is unavailable for this account or Agent during the payment trial.')
-      } else if (res.status === 503) {
+      if (res.status === 503) {
         if (code === 'agent_offline') setErrorMsg(`Agent offline: ${detail}`)
         else if (code === 'agent_busy') setErrorMsg('Agent is busy (at max concurrent chats). Try later.')
         else if (code === 'no_wallet') setErrorMsg('Agent has no payout wallet configured.')
@@ -662,15 +665,17 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
           if (BigInt(current.remainingBudgetMicro) < BigInt(scope.priceMicro)) throw new Error('Payment budget is insufficient for this message')
           if (!quoteMatchesScope(phase, quote, scope)) throw new Error('Payment quote changed. Retry to review the current price.')
           let grant = grantRef.current
-          if (!grantMatches(grant, scope)) {
+          const remaining = grant ? BigInt(grant.budgetMicro) - Object.values(grant.reserved).reduce((sum, amount) => sum + BigInt(amount), BigInt(0)) : BigInt(0)
+          if (!grantMatches(grant, scope) || (grant && !grant.reserved[pending.key] && remaining < BigInt(scope.priceMicro)) || (grant && BigInt(grant.budgetMicro) > BigInt(current.remainingBudgetMicro))) {
             revokePaymentGrant()
-            const accepted = await new Promise<boolean>(resolve => {
+            setAuthorizationBudget(String(Math.max(Number(scope.priceMicro), Math.min(1_000_000, Number(current.remainingBudgetMicro))) / 1_000_000))
+            const accepted = await new Promise<string | null>(resolve => {
               paymentDecisionRef.current = resolve
-              setPaymentConfirmation({ scope, remainingBudgetMicro: String(current.remainingBudgetMicro) })
+              setPaymentConfirmation({ scope, remainingBudgetMicro: String(current.remainingBudgetMicro), minutes: current.authorizationMinutes ?? 60 })
             })
             if (!accepted) return false
             if (payerRef.current.toLowerCase() !== scope.payer) throw new Error('Payment wallet changed. Authorize again.')
-            grant = createPaymentGrant(scope, String(current.remainingBudgetMicro))
+            grant = createPaymentGrant(scope, String(current.remainingBudgetMicro), Date.now(), accepted, current.authorizationMinutes ?? 60)
             grantRef.current = grant
           }
           reserveMessage(grant, pending.key, String(current.remainingBudgetMicro))
@@ -930,7 +935,7 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
               </div>
             )}
             <div className="flex shrink-0 items-center gap-4 text-xs">
-              <button type="button" className="text-primary underline" title="Add Base USDC. Funding does not remove payment trial restrictions." onClick={() => setDepositOpen(true)}>Please add USDC</button>
+              <button type="button" className="text-primary underline" title="Add Base USDC to your wallet." onClick={() => setDepositOpen(true)}>Please add USDC</button>
               {chatStatus === 'error' && pendingMessageRef.current && (
                 <button type="button" className="text-primary underline" title="Retry this message using the same payment request" onClick={() => {
                   if (pendingMessageRef.current) void sendPendingMessage(pendingMessageRef.current)
@@ -1034,11 +1039,14 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
             <p className="break-all font-mono text-xs">{paymentConfirmation?.scope.platformRecipient}</p>
             <p className="text-xs">Agent: {paymentConfirmation ? (Number(paymentConfirmation.scope.agentMicro) / 1_000_000).toFixed(6) : '0'} USDC</p>
             <p className="break-all font-mono text-xs">{paymentConfirmation?.scope.agentRecipient}</p>
-            <p className="text-sm">Remaining budget: {paymentConfirmation ? (Math.min(Number(paymentConfirmation.remainingBudgetMicro), 1_000_000) / 1_000_000).toFixed(6) : '0'} USDC</p>
-            <p className="text-xs text-muted-foreground">For one hour in this tab, sending a paid message automatically signs its platform and Agent payments within this budget. Refreshing or revoking ends authorization. Changed prices, recipients or wallets require a new authorization. Failed attempts keep their budget reserved.</p>
+            <label className="text-sm">Your payment budget (USDC)
+              <input aria-label="Your payment budget (USDC)" type="number" inputMode="decimal" step="0.000001" min={Number(paymentConfirmation?.scope.priceMicro ?? 0) / 1_000_000} max={Number(paymentConfirmation?.remainingBudgetMicro ?? 0) / 1_000_000} value={authorizationBudget} onChange={e => setAuthorizationBudget(e.target.value)} className="mt-2 w-full rounded-xl border bg-secondary px-3 py-2" />
+            </label>
+            <p className="text-xs text-muted-foreground">Maximum: {Number(paymentConfirmation?.remainingBudgetMicro ?? 0) / 1_000_000} USDC. Choose at least the price of one message. This is a spending allowance, not a deposit or upfront charge.</p>
+            <p className="text-xs text-muted-foreground">For {paymentConfirmation?.minutes ?? 60} minutes in this tab, sending a paid message automatically signs its platform and Agent payments within your budget. Refreshing or revoking ends authorization. Changed prices, recipients or wallets require a new authorization. Failed attempts keep their budget reserved. When the budget runs out, you must approve a new one.</p>
             <DialogFooter>
               <button type="button" className="rounded-xl bg-secondary px-4 py-2 text-sm" onClick={() => decidePayment(false)}>Cancel</button>
-              <button type="button" className="rounded-xl bg-primary px-4 py-2 text-sm text-white" onClick={() => decidePayment(true)}>Authorize budget</button>
+              <button type="button" disabled={!validAuthorizationBudget} className="rounded-xl bg-primary px-4 py-2 text-sm text-white disabled:opacity-40" onClick={() => decidePayment(true)}>Authorize budget</button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1080,7 +1088,7 @@ export default function ChatPage({ params }: { params: Promise<{ walletAddress: 
 
         <div className={cn('px-4 sm:px-6', messages.length === 0 ? 'flex flex-1 flex-col justify-center pb-[16vh]' : 'shrink-0 pb-2 pt-2')}>
           {messages.length === 0 && <h1 className="mb-6 text-center text-2xl font-normal leading-7">Where should we begin?</h1>}
-          <ChatComposer placeholder={!agent?.online ? 'Agent is currently offline' : pendingMessageRef.current && !isBusy ? `Resolve the saved request to continue · ${messageCostLabel}` : `Ask anything · ${messageCostLabel}`} disabled={isBusy || !agent?.online || chatStatus === 'error' || !!pendingMessageRef.current} status={chatStatus} onStop={stopPolling} />
+          <ChatComposer costLabel={freeEligible ? 'Free' : eligibilityKnown ? `${priceLabel} U` : '…'} costDescription={freeEligible ? freeMessageLabel : eligibilityKnown ? `${priceLabel} USDC for this message on Base` : unknownEligibilityMessage} placeholder={!agent?.online ? 'Agent is currently offline' : pendingMessageRef.current && !isBusy ? 'Resolve the saved request to continue' : 'Ask anything'} disabled={isBusy || !agent?.online || chatStatus === 'error' || !!pendingMessageRef.current} status={chatStatus} onStop={stopPolling} />
           {messages.length > 0 && <p className="mt-2 text-center text-xs text-[#5d5d5d] dark:text-[#afafaf]">Agents can make mistakes. Check important info.</p>}
         </div>
 

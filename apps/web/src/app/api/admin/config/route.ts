@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { requireAdmin } from '@/lib/session'
-import { getPlatformConfig, updateConfigValue } from '@/lib/platform-config'
+import { getPlatformConfig, updateConfigValues } from '@/lib/platform-config'
+import { CHAT_PAYMENT_CONFIG_KEYS, validChatPaymentSetting, validChatPaymentPolicy } from '@/lib/chat-payment-policy'
 import { CONFIG_KEYS } from '@agentjob/db'
 import { ok, err } from '@/lib/api-response'
 import { validFreeChatLimit } from '@/lib/free-chat-policy'
@@ -35,7 +36,7 @@ export async function PATCH(req: NextRequest) {
   const parsed = updateSchema.safeParse(body)
   if (!parsed.success) return err('Invalid config data', 400)
 
-  const validKeys = [...Object.values(CONFIG_KEYS), ...Object.keys(ATTACHMENT_LIMITS)] as string[]
+  const validKeys = [...Object.values(CONFIG_KEYS), ...Object.keys(ATTACHMENT_LIMITS), ...CHAT_PAYMENT_CONFIG_KEYS] as string[]
   for (const [key, value] of Object.entries(parsed.data)) {
     if (!validKeys.includes(key)) {
       return err(`Unknown config key: ${key}`, 400)
@@ -46,10 +47,19 @@ export async function PATCH(req: NextRequest) {
     if (key === CONFIG_KEYS.PLATFORM_FEE_RATE && (!value.trim() || !Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) >= 1)) return err('Platform fee rate must be at least 0 and less than 1', 400)
     if (!validAttachmentSetting(key, value)) return err('Invalid attachment limit: ' + key, 400)
     if (!validFreeChatLimit(key, value)) return err('Invalid free quota: ' + key, 400)
+    if (!validChatPaymentSetting(key, value)) return err('Invalid chat payment setting: ' + key, 400)
   }
-  for (const [key, value] of Object.entries(parsed.data)) {
-    await updateConfigValue(key, value)
+  if (Object.keys(parsed.data).some(key => CHAT_PAYMENT_CONFIG_KEYS.includes(key))) {
+    const policy = { ...await getPlatformConfig() }
+    for (const [key, value] of Object.entries(parsed.data)) {
+      if (key === 'chat_payments_enabled') policy.chatPaymentsEnabled = value === 'true'
+      if (key === 'chat_max_message_usdc') policy.chatMaxMessageUsdc = Number(value)
+      if (key === 'chat_max_authorization_usdc') policy.chatMaxAuthorizationUsdc = Number(value)
+      if (key === 'chat_authorization_minutes') policy.chatAuthorizationMinutes = Number(value)
+    }
+    if (!validChatPaymentPolicy(policy)) return err('Authorization budget maximum must cover the maximum message price', 400)
   }
+  await updateConfigValues(parsed.data)
 
   writeAuditLog({
     userId: adminSession.userId,

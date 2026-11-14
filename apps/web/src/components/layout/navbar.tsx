@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
+import { LanguageMenu } from './language-menu'
 
 import { Bot, LayoutDashboard, LogIn, LogOut, ShieldCheck, Sun, Moon, BookOpen } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -54,13 +55,14 @@ function useSession() {
 
 export function Navbar() {
   const pathname = usePathname()
+  const chinese = pathname === '/zh'
   const { data: session } = useSession()
   const { dark, toggle } = useDarkMode()
 
   const links = [
-    { href: '/agents', label: 'Agents', icon: Bot },
+    { href: '/agents', label: chinese ? '浏览 Agent' : 'Agents', icon: Bot },
 
-    { href: '/api-docs', label: 'API docs', icon: BookOpen },
+    { href: '/api-docs', label: chinese ? 'API 文档' : 'API docs', icon: BookOpen },
   ]
 
   async function handleLogout() {
@@ -73,16 +75,16 @@ export function Navbar() {
 
   return (
     <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <nav className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-1">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 font-bold text-lg">
+        <Link href={chinese ? '/zh' : '/'} className="flex items-center gap-1 sm:gap-2 font-bold text-base sm:text-lg">
           <Image
             src="/logo.png"
             alt="AgentJob"
             width={32}
             height={32}
             sizes="32px"
-            className="h-8 w-8 shrink-0 object-contain"
+            className="h-6 w-6 sm:h-8 sm:w-8 shrink-0 object-contain"
             priority
           />
           <span className="text-foreground">AgentJob</span>
@@ -108,12 +110,13 @@ export function Navbar() {
         </div>
 
         {/* Auth */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <LanguageMenu chinese={chinese} />
           {/* Dark mode toggle */}
           <button
             onClick={toggle}
             className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-secondary transition-colors"
-            title={dark ? 'Light mode' : 'Dark mode'}
+            title={chinese ? (dark ? '浅色模式' : '深色模式') : dark ? 'Light mode' : 'Dark mode'}
           >
             {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -131,19 +134,19 @@ export function Navbar() {
               <Link
                 href="/dashboard"
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  'flex items-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   pathname.startsWith('/dashboard')
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                 )}
               >
                 <LayoutDashboard className="w-4 h-4" />
-                <span className="hidden sm:inline">Dashboard</span>
+                <span className="hidden sm:inline">{chinese ? '仪表盘' : 'Dashboard'}</span>
               </Link>
               <button
                 onClick={handleLogout}
                 className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-secondary transition-colors"
-                title="Log out"
+                title={chinese ? '退出登录' : 'Log out'}
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -154,7 +157,7 @@ export function Navbar() {
               className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <LogIn className="w-4 h-4" />
-              Log in
+              {chinese ? '登录' : 'Log in'}
             </Link>
           )}
         </div>

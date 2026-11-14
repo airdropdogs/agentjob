@@ -3,7 +3,7 @@ import { userAgentFreeUsed, agentDailyStats, userDailyFreeStats, users } from '@
 import { FREE_SLOT_WARNING_RATIO } from '@agentjob/shared'
 import { getFreeChatPolicy } from './free-chat-policy'
 import type { AppDb } from './db'
-import { CHAT_PAYMENT_ACCEPTANCE_CAP_MICRO, type AcceptanceIntent } from './chat-payment-acceptance'
+import { type AcceptanceIntent } from './chat-payment-acceptance'
 
 export function chatEligibilityOwnershipStatus(chat: { userId: string; agentId: string } | null | undefined, userId: string, agentId: string): 200 | 404 {
   return chat && (chat.userId !== userId || chat.agentId !== agentId) ? 404 : 200
@@ -53,7 +53,7 @@ export async function getChatFreeEligibility(input: {
 export function acceptanceQuote(input: {
   intent: AcceptanceIntent | null; userId: string; agentId: string; chatId?: string
   priceMicro: number; platformFeeMicro: number; platformRecipient: string; agentRecipient: string; payer: string
-  reservedMicro: number
+  authorizationMaxMicro: number
 }) {
   const { intent } = input
   if (intent && (intent.userId !== input.userId || intent.agentId !== input.agentId || (input.chatId && intent.chatId !== input.chatId))) {
@@ -67,7 +67,7 @@ export function acceptanceQuote(input: {
     platformRecipient: intent?.platformRecipient ?? input.platformRecipient,
     agentRecipient: intent?.agentRecipient ?? input.agentRecipient,
     payer: intent?.payer ?? input.payer,
-    remainingBudgetMicro: Math.max(0, CHAT_PAYMENT_ACCEPTANCE_CAP_MICRO - input.reservedMicro) + reservedIntentMicro,
+    remainingBudgetMicro: input.authorizationMaxMicro,
     reservedIntentMicro,
   }
 }

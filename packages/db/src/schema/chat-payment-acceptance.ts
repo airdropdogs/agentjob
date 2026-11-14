@@ -1,10 +1,10 @@
-import { pgTable, text, uuid, integer, timestamp, jsonb, uniqueIndex, check } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, integer, bigint, timestamp, jsonb, uniqueIndex, check } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
 export const chatPaymentAcceptanceBudgets = pgTable('chat_payment_acceptance_budgets', {
   campaignId: text('campaign_id').primaryKey(),
-  reservedMicro: integer('reserved_micro').notNull().default(0),
-}, table => [check('chat_acceptance_budget_cap', sql`${table.reservedMicro} >= 0 and ${table.reservedMicro} <= 1000000`)])
+  reservedMicro: bigint('reserved_micro', { mode: 'bigint' }).notNull().default(BigInt(0)),
+}, table => [check('chat_acceptance_budget_cap', sql`${table.reservedMicro} >= 0`)])
 
 export const chatPaymentAcceptanceIntents = pgTable('chat_payment_acceptance_intents', {
   id: uuid('id').primaryKey(),
@@ -26,7 +26,7 @@ export const chatPaymentAcceptanceIntents = pgTable('chat_payment_acceptance_int
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [
   uniqueIndex('chat_acceptance_idempotency').on(table.campaignId, table.userId, table.idempotencyKey),
-  check('chat_acceptance_amounts', sql`${table.totalMicro} > 0 and ${table.totalMicro} <= 1000000 and ${table.platformFeeMicro} >= 0 and ${table.platformFeeMicro} < ${table.totalMicro}`),
+  check('chat_acceptance_amounts', sql`${table.totalMicro} > 0 and ${table.totalMicro} <= 100000000 and ${table.platformFeeMicro} >= 0 and ${table.platformFeeMicro} < ${table.totalMicro}`),
   check('chat_acceptance_platform_status', sql`${table.platformStatus} in ('pending', 'processing', 'settling', 'settled', 'uncertain')`),
   check('chat_acceptance_agent_status', sql`${table.agentStatus} in ('pending', 'processing', 'settling', 'settled', 'uncertain')`),
 ])

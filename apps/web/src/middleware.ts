@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { redisLimiters } from '@/lib/redis-limiters'
+import { LANGUAGE_COOKIE, preferredHomeLanguage } from '@/lib/home-language'
 
 const SESSION_COOKIE = 'agentjob_session_v2'
 
@@ -28,6 +29,24 @@ function memRateLimit(key: string, limit: number, windowMs: number): boolean {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
+  if (pathname === '/' || pathname === '/zh') {
+    const locale = pathname === '/zh' ? 'zh' : preferredHomeLanguage(
+      req.cookies.get(LANGUAGE_COOKIE)?.value, req.headers.get('cf-ipcountry'),
+    )
+    if (pathname === '/' && locale === 'zh') {
+      const url = req.nextUrl.clone()
+      url.pathname = '/zh'
+      const response = NextResponse.redirect(url, 307)
+      response.headers.set('Cache-Control', 'private, no-store')
+      response.headers.set('Vary', 'Cookie, CF-IPCountry')
+      return response
+    }
+    const headers = new Headers(req.headers)
+    headers.set('x-agentjob-home-language', locale)
+    const response = NextResponse.next({ request: { headers } })
+    response.headers.set('Cache-Control', 'private, no-store')
+    return response
+  }
   const ip =
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     req.headers.get('x-real-ip') ??
@@ -114,6 +133,8 @@ export async function middleware(req: NextRequest) {
 export const config = {
   runtime: 'nodejs',
   matcher: [
+    '/',
+    '/zh',
     '/dashboard/:path*',
     '/admin/:path*',
     '/api/auth/send-otp',

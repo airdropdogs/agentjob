@@ -1,4 +1,5 @@
-export const CHAT_PAYMENT_MAX_MICRO = BigInt(100_000)
+import { CHAT_MESSAGE_HARD_MAX_MICRO, CHAT_AUTHORIZATION_HARD_MAX_MICRO } from './chat-payment-policy'
+export const CHAT_PAYMENT_MAX_MICRO = BigInt(CHAT_MESSAGE_HARD_MAX_MICRO)
 const BASE_USDC = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
 export type PaymentPhase = 'platform_fee' | 'agent'
 export type PaymentQuote = { amount: string; payTo: string; network: string; asset: string }
@@ -6,6 +7,7 @@ export type ChatEligibility = {
   freeMessagesRemaining?: number; freeMessagesPerUser?: number
   eligible: boolean | null; reason: string; payer: string | null; priceMicro: string | number; platformFeeMicro: string | number; agentMicro: string | number
   platformRecipient: string; agentRecipient: string; remainingBudgetMicro: string | number; paymentEnabled: boolean
+  maxMessageMicro?: number; authorizationMinutes?: number
 }
 export type PaymentScope = { agentId: string; payer: string; priceMicro: string; platformFeeMicro: string; agentMicro: string; platformRecipient: string; agentRecipient: string }
 export type PaymentGrant = { scope: PaymentScope; expiresAt: number; budgetMicro: string; reserved: Record<string, string> }
@@ -15,6 +17,7 @@ export function paymentScope(agentId: string, payer: string, eligibility: ChatEl
   const fields = [eligibility.priceMicro, eligibility.platformFeeMicro, eligibility.agentMicro, eligibility.remainingBudgetMicro]
   if (!fields.every(value => /^\d+$/.test(String(value)) && (typeof value !== 'number' || Number.isSafeInteger(value))) || BigInt(eligibility.priceMicro) <= BigInt(0) ||
       BigInt(eligibility.priceMicro) > CHAT_PAYMENT_MAX_MICRO ||
+      (eligibility.maxMessageMicro !== undefined && (!Number.isSafeInteger(eligibility.maxMessageMicro) || Number(eligibility.priceMicro) > eligibility.maxMessageMicro)) ||
       BigInt(eligibility.platformFeeMicro) + BigInt(eligibility.agentMicro) !== BigInt(eligibility.priceMicro) ||
       ![payer, eligibility.platformRecipient, eligibility.agentRecipient].every(value => /^0x[0-9a-f]{40}$/i.test(value))) throw new Error('Invalid payment authorization details')
   return { agentId, payer: payer.toLowerCase(), priceMicro: String(eligibility.priceMicro),
@@ -26,9 +29,11 @@ export function grantMatches(grant: PaymentGrant | null, scope: PaymentScope, no
   return !!grant && grant.expiresAt > now && JSON.stringify(grant.scope) === JSON.stringify(scope)
 }
 
-export function createPaymentGrant(scope: PaymentScope, remainingBudgetMicro: string, now = Date.now()): PaymentGrant {
-  const budget = BigInt(remainingBudgetMicro)
-  return { scope, expiresAt: now + 3_600_000, budgetMicro: String(budget < BigInt(1_000_000) ? budget : BigInt(1_000_000)), reserved: {} }
+export function createPaymentGrant(scope: PaymentScope, remainingBudgetMicro: string, now = Date.now(), chosenBudgetMicro = remainingBudgetMicro, minutes = 60): PaymentGrant {
+  if (![remainingBudgetMicro, chosenBudgetMicro].every(value => /^\d+$/.test(value))) throw new Error('Invalid payment budget')
+  const maximum = BigInt(remainingBudgetMicro), budget = BigInt(chosenBudgetMicro)
+  if (budget < BigInt(scope.priceMicro) || budget > maximum || maximum > BigInt(CHAT_AUTHORIZATION_HARD_MAX_MICRO) || !Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error('Invalid payment budget or expiry')
+  return { scope, expiresAt: now + minutes * 60_000, budgetMicro: String(budget), reserved: {} }
 }
 
 export function reserveMessage(grant: PaymentGrant, key: string, remainingBudgetMicro: string, now = Date.now()): void {
@@ -55,7 +60,7 @@ export async function readPaymentQuote(response: Response): Promise<PaymentQuote
       String(requirement.asset).toLowerCase() !== BASE_USDC ||
       !/^0x[0-9a-f]{40}$/i.test(requirement.payTo ?? '') ||
       typeof amount !== 'string' || !/^\d+$/.test(amount) || BigInt(amount) <= BigInt(0) || BigInt(amount) > CHAT_PAYMENT_MAX_MICRO) {
-    throw new Error('Payment must be Base USDC within the 0.1 USDC message limit')
+    throw new Error('Payment must be Base USDC within the supported message limit')
   }
   return { amount, payTo: requirement.payTo, network: requirement.network, asset: requirement.asset }
 }
@@ -77,7 +82,7 @@ export async function submitChatPayment(options: {
       const quote = await readPaymentQuote(response)
       options.quotes[phase] = quote
       const total = Object.values(options.quotes).reduce((sum, entry) => sum + BigInt(entry.amount), BigInt(0))
-      if (total > CHAT_PAYMENT_MAX_MICRO) throw new Error('Total payment exceeds the 0.1 USDC message limit')
+      if (total > CHAT_PAYMENT_MAX_MICRO) throw new Error('Total payment exceeds the supported message limit')
       if (!(await options.confirm(phase, quote))) throw new Error('Payment cancelled. Retry this message when ready.')
       response = await options.pay(phase, quote)
     }

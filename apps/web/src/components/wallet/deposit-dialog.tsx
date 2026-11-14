@@ -75,7 +75,7 @@ export function DepositDialog({ open, onOpenChange, address, insufficient = fals
         <Tabs.List className="flex rounded-lg bg-secondary p-1" aria-label="Funding method">
           <div className="flex flex-1 items-center rounded-md has-[[data-active]]:bg-background">
             <Tabs.Tab value="wallet" className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm"><Wallet className="h-4 w-4" />Wallet</Tabs.Tab>
-            <DepositHelp label="Wallet transfer help"><p>In your external wallet, select native USDC on Base. Scan this address QR code or paste the address to transfer.</p><p>Current x402 chat payments only require USDC, not ETH. Other transfers may require ETH or gas sponsorship.</p><p>Refresh your balance after funds arrive, then retry your message. Funding does not automatically charge you or remove payment trial restrictions.</p></DepositHelp>
+            <DepositHelp label="Wallet transfer help"><p>In your external wallet, select native USDC on Base. Scan this address QR code or paste the address to transfer.</p><p>Current x402 chat payments only require USDC, not ETH. Other transfers may require ETH or gas sponsorship.</p><p>Refresh your balance after funds arrive, then retry your message. Funding does not automatically charge you.</p></DepositHelp>
           </div>
           <div className="flex flex-1 items-center rounded-md has-[[data-active]]:bg-background">
             <Tabs.Tab value="binance" className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm"><BinanceIcon />Binance</Tabs.Tab>

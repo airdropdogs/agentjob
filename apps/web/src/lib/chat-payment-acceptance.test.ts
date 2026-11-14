@@ -6,6 +6,9 @@ import path from 'node:path'
 import { Pool } from 'pg'
 import { createChatPaymentAcceptance, ChatPaymentAcceptanceError } from './chat-payment-acceptance'
 
+import { DEFAULT_CHAT_PAYMENT_POLICY } from './chat-payment-policy'
+const policy = async () => ({ ...DEFAULT_CHAT_PAYMENT_POLICY, chatMaxMessageUsdc: 0.1 })
+
 const userId = randomUUID(), agentId = randomUUID(), chatId = randomUUID()
 const payer = `0x${'1'.repeat(40)}`, platformRecipient = `0x${'2'.repeat(40)}`, agentRecipient = `0x${'3'.repeat(40)}`
 const tx = (digit: string) => `0x${digit.repeat(64)}`
@@ -29,9 +32,11 @@ test('acceptance uses durable PostgreSQL reservations and settlement claims; no 
     await admin.query(`CREATE SCHEMA ${schema}`)
     await pool.query(readFileSync(path.resolve(__dirname, '../../../../packages/db/migrations/0004_chat_payment_acceptance.sql'), 'utf8'))
     await pool.query(readFileSync(path.resolve(__dirname, '../../../../packages/db/migrations/0012_zero_platform_fee.sql'), 'utf8'))
+    await pool.query('CREATE TABLE platform_config (key text PRIMARY KEY, value text NOT NULL)')
+    await pool.query(readFileSync(path.resolve(__dirname, '../../../../packages/db/migrations/0013_formal_chat_payments.sql'), 'utf8'))
     const reset = () => pool.query('TRUNCATE chat_payment_acceptance_receipts,chat_payment_acceptance_intents,chat_payment_acceptance_budgets')
     await t.test('zero fee skips platform settlement and pays the provider once', async () => {
-      const api = createChatPaymentAcceptance({ pool, env: config() }), request = { ...input(), platformFeeMicro: 0 }
+      const api = createChatPaymentAcceptance({ pool, policy, env: config() }), request = { ...input(), platformFeeMicro: 0 }
       const intent = await api.prepare(request)
       assert.equal(intent.platformStatus, 'settled')
       assert.equal(intent.agentMicro, request.totalMicro)
@@ -49,20 +54,19 @@ test('acceptance uses durable PostgreSQL reservations and settlement claims; no 
       await assert.rejects(api.prepare({ ...input(), platformFeeMicro: -1 }), errorCode('invalid_amount'))
       await reset()
     })
-    await t.test('concurrent intents reserve both stages under the immutable 1 USDC ceiling', async () => {
-      const api = createChatPaymentAcceptance({ pool, env: config() })
+    await t.test('concurrent intents preserve accounting beyond the former lifetime ceiling', async () => {
+      const api = createChatPaymentAcceptance({ pool, policy, env: config() })
       const results = await Promise.allSettled(Array.from({ length: 12 }, () => api.prepare(input())))
-      assert.equal(results.filter(result => result.status === 'fulfilled').length, 10)
-      for (const result of results) if (result.status === 'rejected') assert.ok(errorCode('acceptance_budget_exhausted')(result.reason))
-      assert.equal((await pool.query('SELECT reserved_micro FROM chat_payment_acceptance_budgets')).rows[0].reserved_micro, 1000000)
-      await assert.rejects(pool.query('UPDATE chat_payment_acceptance_budgets SET reserved_micro=1000001'))
+      assert.equal(results.filter(result => result.status === 'fulfilled').length, 12)
+      assert.equal((await pool.query('SELECT reserved_micro FROM chat_payment_acceptance_budgets')).rows[0].reserved_micro, '1200000')
+      await assert.rejects(pool.query('UPDATE chat_payment_acceptance_budgets SET reserved_micro=-1'))
       await reset()
     })
     await t.test('same key reserves once, freezes quote and rejects changed message or identity', async () => {
-      const env = config(), api = createChatPaymentAcceptance({ pool, env }), request = input()
+      const env = config(), api = createChatPaymentAcceptance({ pool, policy, env }), request = input()
       const intents = await Promise.all(Array.from({ length: 5 }, () => api.prepare(request)))
       assert.equal(new Set(intents.map(intent => intent.id)).size, 1)
-      assert.equal((await pool.query('SELECT reserved_micro FROM chat_payment_acceptance_budgets')).rows[0].reserved_micro, 100000)
+      assert.equal((await pool.query('SELECT reserved_micro FROM chat_payment_acceptance_budgets')).rows[0].reserved_micro, '100000')
       assert.equal((await api.prepare({ ...request, totalMicro: 200000 })).totalMicro, 100000)
       await assert.rejects(api.prepare({ ...request, messages: ['changed'] }), errorCode('acceptance_idempotency_conflict'))
       await assert.rejects(api.prepare({ ...request, chatId: randomUUID() }), errorCode('acceptance_idempotency_conflict'))
@@ -71,14 +75,15 @@ test('acceptance uses durable PostgreSQL reservations and settlement claims; no 
       await assert.rejects(api.prepare(input()), errorCode('acceptance_disabled'))
       await reset()
     })
-    await t.test('missing whitelist and invalid or oversized configured limits fail closed', async () => {
+    await t.test('missing whitelist is allowed while invalid or oversized limits fail closed', async () => {
       const env = config(); delete env.CHAT_PAYMENT_ACCEPTANCE_PAYER_ADDRESSES
-      await assert.rejects(createChatPaymentAcceptance({ pool, env }).prepare(input()), errorCode('acceptance_not_allowed'))
-      await assert.rejects(createChatPaymentAcceptance({ pool, env: { ...config(), CHAT_PAYMENT_ACCEPTANCE_MAX_INTENT_MICRO: '1000001' } }).prepare(input()), errorCode('acceptance_invalid_limit'))
-      await assert.rejects(createChatPaymentAcceptance({ pool, env: config() }).prepare({ ...input(), totalMicro: 100001 }), errorCode('acceptance_intent_limit'))
+      await createChatPaymentAcceptance({ pool, policy, env }).prepare(input())
+      await assert.rejects(createChatPaymentAcceptance({ pool, policy: async () => ({ ...DEFAULT_CHAT_PAYMENT_POLICY, chatMaxMessageUsdc: NaN }), env: config() }).prepare(input()), errorCode('acceptance_invalid_limit'))
+      await assert.rejects(createChatPaymentAcceptance({ pool, policy, env: config() }).prepare({ ...input(), totalMicro: 100001 }), errorCode('acceptance_intent_limit'))
+      await reset()
     })
     await t.test('verify can retry, simultaneous settle is claimed once, receipts replay while disabled', async () => {
-      const env = config(), api = createChatPaymentAcceptance({ pool, env }), request = input()
+      const env = config(), api = createChatPaymentAcceptance({ pool, policy, env }), request = input()
       await api.prepare(request)
       let settleCalls = 0
       const stage = { ...request, stage: 'platform_fee' as const, verify: async () => true, settle: async () => { settleCalls++; return { transaction: tx('a') } } }
@@ -94,7 +99,7 @@ test('acceptance uses durable PostgreSQL reservations and settlement claims; no 
       await reset()
     })
     await t.test('disable during verification prevents settlement; uncertain settlement never retries', async () => {
-      const env = config(), api = createChatPaymentAcceptance({ pool, env }), request = input()
+      const env = config(), api = createChatPaymentAcceptance({ pool, policy, env }), request = input()
       await api.prepare(request)
       let settleCalls = 0
       const stage = { ...request, stage: 'platform_fee' as const, verify: async () => true, settle: async () => { settleCalls++; throw new Error('lost facilitator response') } }
@@ -104,11 +109,11 @@ test('acceptance uses durable PostgreSQL reservations and settlement claims; no 
       assert.equal((await api.executeStage(stage)).status, 'uncertain')
       assert.equal((await api.executeStage(stage)).status, 'uncertain')
       assert.equal(settleCalls, 1)
-      assert.equal((await pool.query('SELECT reserved_micro FROM chat_payment_acceptance_budgets')).rows[0].reserved_micro, 100000)
+      assert.equal((await pool.query('SELECT reserved_micro FROM chat_payment_acceptance_budgets')).rows[0].reserved_micro, '100000')
       await reset()
     })
     await t.test('one chain receipt cannot credit two intents and interrupted claims never auto-retry', async () => {
-      const api = createChatPaymentAcceptance({ pool, env: config() }), first = input(), second = input()
+      const api = createChatPaymentAcceptance({ pool, policy, env: config() }), first = input(), second = input()
       await api.prepare(first); await api.prepare(second)
       const callbacks = { stage: 'platform_fee' as const, verify: async () => true, settle: async () => ({ transaction: tx('b') }) }
       assert.equal((await api.executeStage({ ...first, ...callbacks })).status, 'settled')
@@ -118,7 +123,7 @@ test('acceptance uses durable PostgreSQL reservations and settlement claims; no 
       await reset()
     })
     await t.test('delivery and task ID commit once; rollback allows safe delivery retry', async () => {
-      const api = createChatPaymentAcceptance({ pool, env: config() }), request = input()
+      const api = createChatPaymentAcceptance({ pool, policy, env: config() }), request = input()
       await api.prepare(request)
       await api.executeStage({ ...request, stage: 'platform_fee', verify: async () => true, settle: async () => ({ transaction: tx('c') }) })
       await api.executeStage({ ...request, stage: 'agent', verify: async () => true, settle: async () => ({ transaction: tx('d') }) })

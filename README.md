@@ -23,6 +23,10 @@ The distributable skill is in `skills/agentjob`. When updating it, keep `skills/
 
 ## Repository
 
+The canonical source, templates and releases are maintained in [airdropdogs/agentjob](https://github.com/airdropdogs/agentjob), on `main`.
+
+See [paid chat operations](PAYMENTS.md) for Admin payment limits, customer authorization and migration from the limited payment trial.
+
 - `apps/web`: web application and provider API
 - `packages/mcp`: provider connector and legacy MCP integration
 - `packages/db`: database schema and migrations

@@ -338,6 +338,9 @@ function BigStatCard({
 /* ─────────────────── Config ─────────────────── */
 
 const CONFIG_LABELS: Record<string, { label: string; desc: string; type: 'number' | 'text' }> = {
+  chatMaxMessageUsdc: { label: 'Paid message maximum (USDC)', desc: '0.000001–100 USDC per message. No platform lifetime spending cap.', type: 'number' },
+  chatMaxAuthorizationUsdc: { label: 'Automatic payment budget maximum (USDC)', desc: 'Up to 1000 USDC per authorization. Must cover the message maximum. Users choose their own smaller budget.', type: 'number' },
+  chatAuthorizationMinutes: { label: 'Automatic payment authorization (minutes)', desc: '1–1440 minutes. Users can revoke earlier; a new budget requires confirmation.', type: 'number' },
   serverWalletDailyLimit: { label: 'Email-free registrations per day', desc: 'Platform-wide UTC-day limit. Default 100; 0 blocks new registrations. Failed attempts may consume quota.', type: 'number' },
   serverWalletIpDailyLimit: { label: 'Email-free requests per IP per day', desc: 'Default 2; 0 blocks requests. Includes retries and failed attempts. Resets at 00:00 UTC (08:00 Beijing).', type: 'number' },
   attachment_output_max_files: { label: 'Images per Agent reply', desc: '0-10 images; 0 disables image outputs.', type: 'number' },
@@ -435,6 +438,11 @@ function ConfigPanel() {
       <Task className="mb-6">
         <TaskHeader title="Platform config" description="Adjust values and click Save" icon={<Settings className="w-3.5 h-3.5" />} />
         <TaskContent className="py-0">
+          <label className="flex items-center gap-3 py-3 text-sm">
+            <input type="checkbox" checked={String(editValues.chatPaymentsEnabled) === 'true'} onChange={e => setEditValues({ ...editValues, chatPaymentsEnabled: String(e.target.checked) })} />
+            Enable paid chat
+          </label>
+          <p className="pb-3 text-xs text-muted-foreground">No shared lifetime payment budget. Historical payments are retained. The emergency server switch can still disable payments; configuration changes may take up to 60 seconds.</p>
           <label className="flex items-center gap-3 py-3 text-sm">
             <input type="checkbox" checked={String(editValues.serverWalletEnabled) === 'true'} onChange={e => setEditValues({ ...editValues, serverWalletEnabled: String(e.target.checked) })} />
             Enable email-free registration

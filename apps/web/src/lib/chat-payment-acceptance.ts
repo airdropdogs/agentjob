@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { getPool } from './db'
+import { getPlatformConfig } from './platform-config'
+import { CHAT_MESSAGE_HARD_MAX_MICRO, DEFAULT_CHAT_PAYMENT_POLICY, validChatPaymentPolicy, type ChatPaymentPolicy } from './chat-payment-policy'
 
 export const CHAT_PAYMENT_ACCEPTANCE_CAMPAIGN = 'base-usdc-acceptance-v1'
-export const CHAT_PAYMENT_ACCEPTANCE_CAP_MICRO = 1_000_000
+
 export const CHAT_PAYMENT_ACCEPTANCE_ASSET = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
 export type AcceptanceStage = 'platform_fee' | 'agent'
 export type AcceptanceStageStatus = 'pending' | 'processing' | 'settling' | 'settled' | 'uncertain'
@@ -53,24 +55,17 @@ async function read(client: PoolClient, userId: string, key: string, lock = fals
     receipts: receipts.rows.map(receipt => ({ transaction: receipt.transaction, stage: receipt.stage, amountMicro: receipt.amount_micro, recipient: receipt.recipient, payer: receipt.payer })) }
 }
 
-export function assertChatPaymentAcceptanceAllowed(intent: Pick<AcceptanceIntent, 'userId' | 'agentId' | 'payer' | 'platformRecipient' | 'agentRecipient' | 'totalMicro'>, config: NodeJS.ProcessEnv = process.env) {
-    if (config.ENABLE_CHAT_PAYMENT_ACCEPTANCE !== 'true') fail('acceptance_disabled', 503)
-    const allowed = (key: string, value: string) => (config[key] ?? '').split(',').map(item => item.trim().toLowerCase()).filter(Boolean).includes(value.toLowerCase())
-    const matches = [
-      ['CHAT_PAYMENT_ACCEPTANCE_USER_IDS', intent.userId], ['CHAT_PAYMENT_ACCEPTANCE_AGENT_IDS', intent.agentId],
-      ['CHAT_PAYMENT_ACCEPTANCE_PAYER_ADDRESSES', intent.payer], ['CHAT_PAYMENT_ACCEPTANCE_PLATFORM_RECIPIENTS', intent.platformRecipient],
-      ['CHAT_PAYMENT_ACCEPTANCE_AGENT_RECIPIENTS', intent.agentRecipient],
-    ]
-    if (!matches.every(([key, value]) => allowed(key, value))) fail('acceptance_not_allowed', 403)
-    const maximum = Number(config.CHAT_PAYMENT_ACCEPTANCE_MAX_INTENT_MICRO ?? 100_000)
-    if (!Number.isSafeInteger(maximum) || maximum <= 0 || maximum > CHAT_PAYMENT_ACCEPTANCE_CAP_MICRO) fail('acceptance_invalid_limit', 503)
+export function assertChatPaymentAcceptanceAllowed(intent: Pick<AcceptanceIntent, 'userId' | 'agentId' | 'payer' | 'platformRecipient' | 'agentRecipient' | 'totalMicro'>, config: NodeJS.ProcessEnv = process.env, policy: ChatPaymentPolicy = DEFAULT_CHAT_PAYMENT_POLICY) {
+    if (config.ENABLE_CHAT_PAYMENT_ACCEPTANCE === 'false' || !policy.chatPaymentsEnabled) fail('acceptance_disabled', 503)
+    const maximum = Math.round(policy.chatMaxMessageUsdc * 1_000_000)
+    if (!validChatPaymentPolicy(policy)) fail('acceptance_invalid_limit', 503)
     if (intent.totalMicro > maximum) fail('acceptance_intent_limit', 403)
   }
 
-export function createChatPaymentAcceptance(options: { pool?: Pool; env?: NodeJS.ProcessEnv } = {}) {
+export function createChatPaymentAcceptance(options: { pool?: Pool; env?: NodeJS.ProcessEnv; policy?: () => Promise<ChatPaymentPolicy> } = {}) {
   const pool = () => options.pool ?? getPool()
   const env = () => options.env ?? process.env
-  const assertAllowed = (intent: Pick<AcceptanceIntent, 'userId' | 'agentId' | 'payer' | 'platformRecipient' | 'agentRecipient' | 'totalMicro'>) => assertChatPaymentAcceptanceAllowed(intent, env())
+  const assertAllowed = async (intent: Pick<AcceptanceIntent, 'userId' | 'agentId' | 'payer' | 'platformRecipient' | 'agentRecipient' | 'totalMicro'>) => assertChatPaymentAcceptanceAllowed(intent, env(), await (options.policy ?? getPlatformConfig)())
   async function transaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await pool().connect()
     try { await client.query('BEGIN'); const result = await fn(client); await client.query('COMMIT'); return result }
@@ -92,16 +87,16 @@ export function createChatPaymentAcceptance(options: { pool?: Pool; env?: NodeJS
     }
     const existing = await get(input)
     if (existing) return checkExisting(existing)
-    assertAllowed(normalized)
-    if (!Number.isSafeInteger(input.totalMicro) || !Number.isSafeInteger(input.platformFeeMicro) || input.totalMicro <= 0 || input.totalMicro > CHAT_PAYMENT_ACCEPTANCE_CAP_MICRO || input.platformFeeMicro < 0 || input.platformFeeMicro >= input.totalMicro) fail('invalid_amount', 400)
+    await assertAllowed(normalized)
+    if (!Number.isSafeInteger(input.totalMicro) || !Number.isSafeInteger(input.platformFeeMicro) || input.totalMicro <= 0 || input.totalMicro > CHAT_MESSAGE_HARD_MAX_MICRO || input.platformFeeMicro < 0 || input.platformFeeMicro >= input.totalMicro) fail('invalid_amount', 400)
     return transaction(async client => {
       await client.query('INSERT INTO chat_payment_acceptance_budgets(campaign_id) VALUES($1) ON CONFLICT DO NOTHING', [campaign])
       await client.query('SELECT campaign_id FROM chat_payment_acceptance_budgets WHERE campaign_id=$1 FOR UPDATE', [campaign])
       const raced = await read(client, input.userId, input.idempotencyKey)
       if (raced) return checkExisting(raced)
-      assertAllowed(normalized)
-      const reserved = await client.query('UPDATE chat_payment_acceptance_budgets SET reserved_micro=reserved_micro+$2 WHERE campaign_id=$1 AND reserved_micro+$2 <= $3 RETURNING reserved_micro', [campaign, input.totalMicro, CHAT_PAYMENT_ACCEPTANCE_CAP_MICRO])
-      if (!reserved.rowCount) fail('acceptance_budget_exhausted', 403)
+      await assertAllowed(normalized)
+      // Historical accounting only: there is no platform lifetime spending ceiling.
+      await client.query('UPDATE chat_payment_acceptance_budgets SET reserved_micro=reserved_micro+$2 WHERE campaign_id=$1', [campaign, input.totalMicro])
       await client.query(`INSERT INTO chat_payment_acceptance_intents(id,campaign_id,user_id,agent_id,chat_id,idempotency_key,messages_hash,payer,platform_recipient,agent_recipient,total_micro,platform_fee_micro) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [randomUUID(), campaign, input.userId, input.agentId, input.chatId, input.idempotencyKey, hash, normalized.payer, normalized.platformRecipient, normalized.agentRecipient, input.totalMicro, input.platformFeeMicro])
       if (input.platformFeeMicro === 0) await client.query("UPDATE chat_payment_acceptance_intents SET platform_status='settled' WHERE campaign_id=$1 AND user_id=$2 AND idempotency_key=$3", [campaign, input.userId, input.idempotencyKey])
       return (await read(client, input.userId, input.idempotencyKey))!
@@ -120,7 +115,7 @@ export function createChatPaymentAcceptance(options: { pool?: Pool; env?: NodeJS
       if (status === 'settled') return { intent, status: 'settled' as const }
       if (status === 'uncertain') return { intent, status: 'uncertain' as const }
       if (status === 'processing' || status === 'settling') return { intent, status: 'busy' as const }
-      assertAllowed(intent)
+      await assertAllowed(intent)
       if (input.stage === 'agent' && intent.platformStatus !== 'settled') return fail('acceptance_platform_fee_required')
       await client.query(`UPDATE chat_payment_acceptance_intents SET ${field}='processing' WHERE id=$1`, [intent.id])
       return { intent, status: 'claimed' as const }
@@ -133,13 +128,13 @@ export function createChatPaymentAcceptance(options: { pool?: Pool; env?: NodeJS
       await pool().query(`UPDATE chat_payment_acceptance_intents SET ${field}='pending' WHERE id=$1 AND ${field}='processing'`, [intent.id])
       return { status: 'verify_failed', intent: (await get(input))! }
     }
-    try { assertAllowed(intent) } catch (error) {
+    try { await assertAllowed(intent) } catch (error) {
       await pool().query(`UPDATE chat_payment_acceptance_intents SET ${field}='pending' WHERE id=$1 AND ${field}='processing'`, [intent.id])
       throw error
     }
     await pool().query(`UPDATE chat_payment_acceptance_intents SET ${field}='settling' WHERE id=$1 AND ${field}='processing'`, [intent.id])
     try {
-      assertAllowed(intent)
+      await assertAllowed(intent)
     } catch (error) {
       await pool().query(`UPDATE chat_payment_acceptance_intents SET ${field}='pending' WHERE id=$1 AND ${field}='settling'`, [intent.id])
       throw error

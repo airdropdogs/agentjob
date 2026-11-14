@@ -2,8 +2,9 @@ import { getFreeChatPolicy } from './free-chat-policy'
 import { getDb } from './db'
 import { platformConfig, CONFIG_KEYS } from '@agentjob/db'
 import { eq } from 'drizzle-orm'
+import { DEFAULT_CHAT_PAYMENT_POLICY, type ChatPaymentPolicy } from './chat-payment-policy'
 
-interface PlatformConfigValues {
+interface PlatformConfigValues extends ChatPaymentPolicy {
   platformFeeRate: number
   minPriceUsdc: number
   maxPriceUsdc: number
@@ -30,6 +31,7 @@ interface PlatformConfigValues {
 }
 
 const DEFAULTS: PlatformConfigValues = {
+  ...DEFAULT_CHAT_PAYMENT_POLICY,
   platformFeeRate: 0.05,
   minPriceUsdc: 0.001,
   maxPriceUsdc: 100,
@@ -68,6 +70,10 @@ export async function getPlatformConfig(): Promise<PlatformConfigValues> {
   }
 
   _configCache = {
+    chatPaymentsEnabled: (map.chat_payments_enabled ?? 'true') === 'true',
+    chatMaxMessageUsdc: Number(map.chat_max_message_usdc ?? DEFAULTS.chatMaxMessageUsdc),
+    chatMaxAuthorizationUsdc: Number(map.chat_max_authorization_usdc ?? DEFAULTS.chatMaxAuthorizationUsdc),
+    chatAuthorizationMinutes: Number(map.chat_authorization_minutes ?? DEFAULTS.chatAuthorizationMinutes),
     platformFeeRate: parseFloat(map[CONFIG_KEYS.PLATFORM_FEE_RATE] ?? String(DEFAULTS.platformFeeRate)),
     minPriceUsdc: parseFloat(map[CONFIG_KEYS.MIN_PRICE_USDC] ?? String(DEFAULTS.minPriceUsdc)),
     maxPriceUsdc: parseFloat(map[CONFIG_KEYS.MAX_PRICE_USDC] ?? String(DEFAULTS.maxPriceUsdc)),
@@ -98,4 +104,13 @@ export async function updateConfigValue(key: string, value: string): Promise<voi
     .values({ key, value })
     .onConflictDoUpdate({ target: platformConfig.key, set: { value, updatedAt: new Date() } })
   _configCache = null // bust cache
+}
+
+export async function updateConfigValues(values: Record<string, string>): Promise<void> {
+  await getDb().transaction(async tx => {
+    for (const [key, value] of Object.entries(values)) {
+      await tx.insert(platformConfig).values({ key, value }).onConflictDoUpdate({ target: platformConfig.key, set: { value, updatedAt: new Date() } })
+    }
+  })
+  _configCache = null
 }

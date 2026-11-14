@@ -63,7 +63,7 @@ const intent: AcceptanceIntent = {
   totalMicro: 50000, platformFeeMicro: 2500, agentMicro: 47500,
   platformStatus: 'settled', agentStatus: 'pending', taskId: null, receipts: [], delivery: null,
 }
-const input = { intent, userId: 'owner', agentId: 'agent', chatId: 'chat', priceMicro: 99999, platformFeeMicro: 999, platformRecipient: 'new-platform', agentRecipient: 'new-recipient', payer: 'payer', reservedMicro: 1_000_000 }
+const input = { intent, userId: 'owner', agentId: 'agent', chatId: 'chat', priceMicro: 99999, platformFeeMicro: 999, platformRecipient: 'new-platform', agentRecipient: 'new-recipient', payer: 'payer', authorizationMaxMicro: 100_000_000 }
 
 test('last reserved intent remains resumable with frozen quote and cannot cross identity boundaries', () => {
   const quote = acceptanceQuote(input)
@@ -71,17 +71,18 @@ test('last reserved intent remains resumable with frozen quote and cannot cross 
   assert.equal(quote.platformFeeMicro, 2500)
   assert.equal(quote.platformRecipient, 'platform')
   assert.equal(quote.agentRecipient, 'recipient')
-  assert.equal(quote.remainingBudgetMicro, 50000)
+  assert.equal(quote.remainingBudgetMicro, 100_000_000)
   assert.equal(quote.reservedIntentMicro, 50000)
-  assert.equal(acceptanceQuote({ ...input, intent: { ...intent, taskId: 'done' } }).remainingBudgetMicro, 0)
+  assert.equal(acceptanceQuote({ ...input, intent: { ...intent, taskId: 'done' } }).remainingBudgetMicro, 100_000_000)
   for (const change of [{ userId: 'other' }, { agentId: 'other' }, { chatId: 'other' }]) {
     assert.throws(() => acceptanceQuote({ ...input, ...change }), /intent_mismatch/)
   }
 })
 
-test('ordinary users cannot advertise enabled acceptance payments', () => {
+test('paid chat permits users and Agents outside the former trial whitelist', () => {
   const env = { NODE_ENV: 'test' as const, ENABLE_CHAT_PAYMENT_ACCEPTANCE: 'true', CHAT_PAYMENT_ACCEPTANCE_USER_IDS: 'owner', CHAT_PAYMENT_ACCEPTANCE_AGENT_IDS: 'agent', CHAT_PAYMENT_ACCEPTANCE_PAYER_ADDRESSES: 'payer', CHAT_PAYMENT_ACCEPTANCE_PLATFORM_RECIPIENTS: 'platform', CHAT_PAYMENT_ACCEPTANCE_AGENT_RECIPIENTS: 'recipient' }
   assert.doesNotThrow(() => assertChatPaymentAcceptanceAllowed(intent, env))
-  assert.throws(() => assertChatPaymentAcceptanceAllowed({ ...intent, userId: 'ordinary' }, env), /acceptance_not_allowed/)
+  assert.doesNotThrow(() => assertChatPaymentAcceptanceAllowed({ ...intent, userId: 'ordinary', agentId: 'new-agent', payer: 'new-payer', agentRecipient: 'new-recipient', platformRecipient: 'new-platform' }, env))
+  assert.doesNotThrow(() => assertChatPaymentAcceptanceAllowed(intent, { NODE_ENV: 'test', ENABLE_CHAT_PAYMENT_ACCEPTANCE: 'true' }))
   assert.throws(() => assertChatPaymentAcceptanceAllowed(intent, { ...env, ENABLE_CHAT_PAYMENT_ACCEPTANCE: 'false' }), /acceptance_disabled/)
 })

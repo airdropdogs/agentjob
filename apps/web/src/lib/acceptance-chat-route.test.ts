@@ -39,7 +39,7 @@ test('settled chat acceptance delivers exactly one task/payment/message on concu
     await pool.query(readFileSync(path.resolve(__dirname, '../../../../packages/db/migrations/0006_chat_attachments.sql'), 'utf8'))
     await pool.query(readFileSync(path.resolve(__dirname, '../../../../packages/db/migrations/0007_chat_deliveries.sql'), 'utf8'))
     globalDb.agentjobPool = pool
-    const ledger = createChatPaymentAcceptance({ pool, env })
+    const ledger = createChatPaymentAcceptance({ pool, env, policy: async () => ({ chatPaymentsEnabled: true, chatMaxMessageUsdc: 100, chatMaxAuthorizationUsdc: 100, chatAuthorizationMinutes: 60 }) })
     const prepared = await ledger.prepare({ userId, agentId, chatId, idempotencyKey: key, messages, payer, platformRecipient, agentRecipient, totalMicro: 100000, platformFeeMicro: 5000 })
     let mockSettlements = 0
     await ledger.executeStage({ userId, idempotencyKey: key, stage: 'platform_fee', verify: async () => true, settle: async () => { mockSettlements++; return { transaction: txPlatform } } })

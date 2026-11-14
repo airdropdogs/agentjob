@@ -31,7 +31,9 @@ const STATUS_CONFIG = {
   offline: { dot: 'bg-muted-foreground/40', text: 'Offline', btn: 'bg-secondary text-muted-foreground' },
 }
 
-export function AgentCard({ agent }: { agent: AgentCardData }) {
+export function AgentCard({ agent, locale = 'en' }: { agent: AgentCardData; locale?: 'en' | 'zh' }) {
+  const zh = locale === 'zh'
+  const t = (text: string) => zh ? ({ 'Online': '在线', 'Busy': '忙碌', 'Offline': '离线', 'Reply issues': '回复异常', 'Reply unverified': '回复待验证', 'Text chat': '文字聊天', 'Image understanding': '图片理解', 'Image generation': '图片生成', 'Image editing': '图片编辑', 'Unknown': '未知' } as Record<string, string>)[text] ?? text : text
   const href = `/agents/${agent.walletAddress ?? agent.id}`
   const successPct = Math.round(parseFloat(agent.successRate || '1') * 100)
   const status = STATUS_CONFIG[agent.onlineStatus] ?? STATUS_CONFIG.offline
@@ -55,7 +57,7 @@ export function AgentCard({ agent }: { agent: AgentCardData }) {
             </div>
             <div className="flex items-center gap-1 mt-0.5">
               <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', status.dot)} />
-              <span className="text-[10px] text-muted-foreground">{agent.responseRank === 2 ? 'Reply issues' : agent.responseRank === 1 ? 'Reply unverified' : status.text}</span>
+              <span className="text-[10px] text-muted-foreground">{t(agent.responseRank === 2 ? 'Reply issues' : agent.responseRank === 1 ? 'Reply unverified' : status.text)}</span>
               {agent.agentType && (
                 <>
                   <span className="text-muted-foreground/30 text-[10px]">·</span>
@@ -67,12 +69,12 @@ export function AgentCard({ agent }: { agent: AgentCardData }) {
         </div>
 
         <div className="h-16 shrink-0 grid grid-cols-2 grid-rows-2 gap-1 overflow-hidden" aria-label="Verified capabilities">
-          {capabilities.map(id => <span key={id} className="flex min-w-0 items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 text-[10px] leading-tight text-emerald-600"><CheckCircle2 aria-hidden="true" className="h-3 w-3 shrink-0" /><span className="line-clamp-2">{CAPABILITIES[id as keyof typeof CAPABILITIES]}</span></span>)}
-          {!capabilities.length && <span className="col-span-2 text-xs text-muted-foreground">Not verified yet</span>}
+          {capabilities.map(id => <span key={id} className="flex min-w-0 items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 text-[10px] leading-tight text-emerald-600"><CheckCircle2 aria-hidden="true" className="h-3 w-3 shrink-0" /><span className="line-clamp-2">{t(CAPABILITIES[id as keyof typeof CAPABILITIES])}</span></span>)}
+          {!capabilities.length && <span className="col-span-2 text-xs text-muted-foreground">{zh ? '尚未验证' : 'Not verified yet'}</span>}
         </div>
         <div className="h-10 shrink-0 space-y-1 text-[11px] text-muted-foreground overflow-hidden" aria-label="Published runtime information">
-          <p className="truncate">Framework: <span className="text-foreground">{agent.approvedRuntime?.framework || 'Unknown'}</span></p>
-          <p className="truncate">Model: <span className="text-foreground">{agent.approvedRuntime?.model || 'Unknown'}</span></p>
+          <p className="truncate">{zh ? '框架：' : 'Framework: '}<span className="text-foreground">{agent.approvedRuntime?.framework || t('Unknown')}</span></p>
+          <p className="truncate">{zh ? '模型：' : 'Model: '}<span className="text-foreground">{agent.approvedRuntime?.model || t('Unknown')}</span></p>
         </div>
 
         {/* Stats */}
@@ -89,11 +91,11 @@ export function AgentCard({ agent }: { agent: AgentCardData }) {
         <div className="h-12 shrink-0 flex items-center justify-between gap-2">
           <div className="min-w-0">
             <span className="text-sm font-bold text-primary">{formatUsdc(agent.priceSubsequent)}</span>
-            <span className="text-[10px] text-muted-foreground ml-0.5">USDC/msg</span>
-            {offersFree && <span className="mt-1 block text-[10px] text-emerald-500">Up to {agent.freeMessagesPerUser ?? 1} free/user</span>}
+            <span className="text-[10px] text-muted-foreground ml-0.5">{zh ? 'USDC/条' : 'USDC/msg'}</span>
+            {offersFree && <span className="mt-1 block text-[10px] text-emerald-500">{zh ? `每人最多 ${agent.freeMessagesPerUser ?? 1} 条免费` : `Up to ${agent.freeMessagesPerUser ?? 1} free/user`}</span>}
           </div>
           <Link href={`/chat/${agent.walletAddress ?? agent.id}`} title={offersFree ? 'Free messages subject to your remaining allowance and daily availability' : 'Open chat'} className={cn('relative z-20 shrink-0 text-[11px] px-3 py-1.5 rounded-lg font-medium transition-colors', status.btn)}>
-            {agent.onlineStatus === 'online' ? offersFree ? 'Try free' : 'Chat' : agent.onlineStatus === 'busy' ? 'Busy' : 'Offline'}
+            {agent.onlineStatus === 'online' ? offersFree ? (zh ? '免费试聊' : 'Try free') : (zh ? '聊天' : 'Chat') : t(agent.onlineStatus === 'busy' ? 'Busy' : 'Offline')}
           </Link>
         </div>
       </div>

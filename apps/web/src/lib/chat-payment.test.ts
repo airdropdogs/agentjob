@@ -41,7 +41,7 @@ test('cancelled confirmation does not sign; unsupported assets and limits are re
   await assert.rejects(submitChatPayment({ quotes: {}, request: async () => required(), confirm: async () => false,
     pay: async () => { signed = true; return new Response() } }), /cancelled/)
   assert.equal(signed, false)
-  for (const response of [required('100001'), required('0'), required('100', { network: 'base-sepolia' }), required('100', { asset: recipient })]) {
+  for (const response of [required('100000001'), required('0'), required('100', { network: 'base-sepolia' }), required('100', { asset: recipient })]) {
     await assert.rejects(readPaymentQuote(response), /Base USDC/)
   }
   const quote = await readPaymentQuote(required())
@@ -50,7 +50,7 @@ test('cancelled confirmation does not sign; unsupported assets and limits are re
 })
 
 test('combined stage amounts cannot exceed the per-message cap', async () => {
-  const quotes = { platform_fee: await readPaymentQuote(required('10000')) }
+  const quotes = { platform_fee: await readPaymentQuote(required('99910000')) }
   await assert.rejects(submitChatPayment({ quotes,
     request: async phase => phase === 'platform_fee' ? Response.json({ ok: true }) : required('95000'),
     confirm: async () => { throw new Error('must reject before confirmation') },
@@ -90,13 +90,12 @@ test('revocation, expiration, different Agent, payer, price or recipient invalid
   assert.throws(() => paymentScope('agent-one', '0x2222222222222222222222222222222222222222', eligibility), /wallet does not match/)
 })
 
-test('fresh authorization cannot reset the server remaining budget', () => {
+test('authorization enforces configured maximum and rejects zero budgets', () => {
   const scope = paymentScope('agent-one', recipient, eligibility)
   const grant = createPaymentGrant(scope, '100000', 1000)
   reserveMessage(grant, 'last-message', '100000', 1001)
   assert.throws(() => reserveMessage(grant, 'another-message', '100000', 1002), /budget exhausted/)
-  const renewed = createPaymentGrant(scope, '0', 1003)
-  assert.throws(() => reserveMessage(renewed, 'another-message', '0', 1004), /budget exhausted/)
+  assert.throws(() => createPaymentGrant(scope, '0', 1003), /budget/)
 })
 
 test('numeric eligibility API fields normalize to exact x402 quote amounts', async () => {
@@ -105,6 +104,20 @@ test('numeric eligibility API fields normalize to exact x402 quote amounts', asy
   assert.equal(scope.priceMicro, '100000')
   assert.equal(quoteMatchesScope('platform_fee', await readPaymentQuote(required('5000')), scope), true)
   assert.equal(quoteMatchesScope('agent', await readPaymentQuote(required('95000')), scope), true)
+})
+
+test('users choose a renewable budget within Admin limits and configured expiry', () => {
+  const scope = paymentScope('agent-one', recipient, eligibility)
+  const grant = createPaymentGrant(scope, '100000000', 1000, '2000000', 15)
+  assert.equal(grant.budgetMicro, '2000000')
+  assert.equal(grant.expiresAt, 901000)
+  for (let i = 0; i < 20; i++) reserveMessage(grant, `message-${i}`, '100000000', 1001)
+  assert.throws(() => reserveMessage(grant, 'exhausted', '100000000', 1002), /exhausted/)
+  const renewed = createPaymentGrant(scope, '100000000', 1003, '1000000', 15)
+  assert.doesNotThrow(() => reserveMessage(renewed, 'new-message', '100000000', 1004))
+  assert.throws(() => createPaymentGrant(scope, '1000000', 1000, '2000000'), /budget/)
+  assert.throws(() => createPaymentGrant(scope, '1000000', 1000, '50000'), /budget/)
+  assert.throws(() => createPaymentGrant(scope, '1000000', 1000, '100000', 1441), /expiry/)
 })
 
 test('one budget authorization covers phases and messages; expiration and changed prices require reauthorization', async () => {

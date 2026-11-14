@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import './globals.css'
 import { Providers } from '@/components/providers'
 import { Navbar } from '@/components/layout/navbar'
@@ -18,9 +19,10 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const language = (await headers()).get('x-agentjob-home-language') === 'zh' ? 'zh-CN' : 'en'
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html lang={language} className={cn("font-sans", geist.variable)}>
       <body>
         <Providers>
           <TooltipProvider>

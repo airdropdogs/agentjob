@@ -17,13 +17,13 @@ export async function acceptanceChat(input: {
   if (!session.cdpVerified) return json({ error: 'Please sign in again before payment.', code: 'verified_login_required' }, 401)
   if (!key) return json({ error: 'A stable Idempotency-Key is required.', code: 'idempotency_required' }, 400)
   const previous = await ledger.get({ userId: session.userId, idempotencyKey: key })
-  if (!previous && process.env.ENABLE_CHAT_PAYMENT_ACCEPTANCE !== 'true') return json({ error: 'Paid requests are temporarily unavailable', code: 'payments_disabled' }, 503)
+  if (!previous && process.env.ENABLE_CHAT_PAYMENT_ACCEPTANCE === 'false') return json({ error: 'Paid requests are temporarily unavailable', code: 'payments_disabled' }, 503)
   const totalMicro = Math.round(Number(input.totalUsdc) * 1_000_000)
   const intent = await ledger.prepare({
     userId: session.userId, agentId, chatId, idempotencyKey: key, messages,
     payer: session.wallet ?? '',
-    platformRecipient: previous?.platformRecipient ?? process.env.CHAT_PAYMENT_ACCEPTANCE_PLATFORM_WALLET ?? '',
-    agentRecipient: previous?.agentRecipient ?? process.env.CHAT_PAYMENT_ACCEPTANCE_AGENT_WALLET ?? input.agentWallet ?? '',
+    platformRecipient: previous?.platformRecipient ?? process.env.PLATFORM_USDC_WALLET ?? process.env.CHAT_PAYMENT_ACCEPTANCE_PLATFORM_WALLET ?? (input.feeRate === 0 ? input.agentWallet ?? '' : ''),
+    agentRecipient: previous?.agentRecipient ?? input.agentWallet ?? '',
     totalMicro, platformFeeMicro: Math.round(totalMicro * input.feeRate),
   })
   if (intent.taskId) return pending(intent)
@@ -36,7 +36,7 @@ export async function acceptanceChat(input: {
   }
   if (!input.online) return json({ error: 'Agent is offline. Keep this message and retry when online.', code: 'agent_offline' }, 503)
   if (stage === 'agent' && intent.platformStatus !== 'settled') return json({ error: 'Confirm the platform fee first.', code: 'platform_fee_required' }, 409)
-  if (process.env.ENABLE_CHAT_PAYMENT_ACCEPTANCE !== 'true') return json({ error: 'Paid requests are temporarily unavailable', code: 'payments_disabled' }, 503)
+  if (process.env.ENABLE_CHAT_PAYMENT_ACCEPTANCE === 'false') return json({ error: 'Paid requests are temporarily unavailable', code: 'payments_disabled' }, 503)
   const amount = stage === 'platform_fee' ? intent.platformFeeMicro : intent.agentMicro
   const recipient = stage === 'platform_fee' ? intent.platformRecipient : intent.agentRecipient
   const requirements = {
